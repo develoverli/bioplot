@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, type ReactNode } from 'react'
+import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode } from 'react'
 import { Check, ChevronRight, X } from 'lucide-react'
 import type { Rarity } from '../lib/types'
 import { titleCase } from '../lib/format'
@@ -21,15 +21,15 @@ export function Card({
       className={`rounded-xl border border-line bg-surface shadow-[var(--shadow-1)] ${className}`}
     >
       {title ? (
-        <header className="flex flex-wrap items-start justify-between gap-3 border-b border-line px-4 py-3 sm:px-5">
+        <header className="flex flex-wrap items-start justify-between gap-2 border-b border-line px-3.5 py-2.5">
           <div className="min-w-0">
-            <h2 className="text-base font-semibold tracking-tight text-ink">{title}</h2>
-            {description ? <p className="mt-0.5 text-sm text-muted">{description}</p> : null}
+            <h2 className="text-sm font-semibold tracking-tight text-ink">{title}</h2>
+            {description ? <p className="mt-0.5 text-xs text-muted">{description}</p> : null}
           </div>
-          {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
+          {actions ? <div className="flex shrink-0 items-center gap-1.5">{actions}</div> : null}
         </header>
       ) : null}
-      <div className="px-4 py-4 sm:px-5">{children}</div>
+      <div className="px-3.5 py-3">{children}</div>
     </section>
   )
 }
@@ -53,7 +53,7 @@ export function Button({
   return (
     <button
       {...props}
-      className={`inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border px-3.5 text-sm font-medium transition-colors duration-150 ${BUTTON_STYLES[variant]} ${className}`}
+      className={`inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition-colors duration-150 ${BUTTON_STYLES[variant]} ${className}`}
     />
   )
 }
@@ -69,7 +69,7 @@ export function IconButton({
       {...props}
       aria-label={label}
       title={label}
-      className={`inline-flex size-10 items-center justify-center rounded-lg border border-transparent text-muted transition-colors duration-150 hover:bg-surface-2 hover:text-ink active:bg-surface-3 ${className}`}
+      className={`inline-flex size-9 items-center justify-center rounded-lg border border-transparent text-muted transition-colors duration-150 hover:bg-surface-2 hover:text-ink active:bg-surface-3 ${className}`}
     >
       {children}
     </button>
@@ -88,7 +88,7 @@ export function Field({
   const id = useId()
   return (
     <div className="flex min-w-0 flex-col gap-1">
-      <label htmlFor={id} className="text-xs font-medium uppercase tracking-wide text-faint">
+      <label htmlFor={id} className="text-xs font-medium tracking-wide text-faint uppercase">
         {label}
       </label>
       {children(id)}
@@ -98,7 +98,7 @@ export function Field({
 }
 
 const CONTROL_CLASS =
-  'min-h-10 w-full rounded-lg border border-line bg-surface-2 px-2.5 text-sm text-ink transition-colors duration-150 hover:border-line-strong'
+  'min-h-9 w-full rounded-lg border border-line bg-surface-2 px-2.5 text-sm text-ink transition-colors duration-150 hover:border-line-strong'
 
 export function Select({ className = '', ...props }: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return <select {...props} className={`${CONTROL_CLASS} ${className}`} />
@@ -176,7 +176,7 @@ export function CheckSwitch({
       role="switch"
       aria-checked={checked}
       onClick={() => onChange(!checked)}
-      className={`flex w-full items-center gap-2.5 rounded-lg border px-2.5 py-2 text-left transition-colors duration-150 ${
+      className={`flex w-full items-center gap-2 rounded-lg border px-2 py-1.5 text-left transition-colors duration-150 ${
         checked
           ? 'border-line bg-surface-2 hover:border-line-strong'
           : 'border-transparent bg-transparent hover:bg-surface-2'
@@ -184,16 +184,18 @@ export function CheckSwitch({
     >
       <span
         aria-hidden="true"
-        className={`flex size-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors duration-150 ${
+        className={`flex size-4 shrink-0 items-center justify-center rounded-full border-2 transition-colors duration-150 ${
           checked
             ? 'border-[color:var(--accent)] bg-accent text-[color:var(--accent-contrast)]'
             : 'border-line-strong'
         }`}
       >
-        {checked ? <Check size={12} strokeWidth={3} /> : null}
+        {checked ? <Check size={10} strokeWidth={3.5} /> : null}
       </span>
 
-      {icon ? <span className="shrink-0 text-muted">{icon}</span> : null}
+      {icon ? (
+        <span className={`shrink-0 ${checked ? 'text-accent' : 'text-faint'}`}>{icon}</span>
+      ) : null}
 
       <span className="min-w-0 flex-1">
         <span className={`block text-sm ${checked ? 'text-ink' : 'text-muted'}`}>{label}</span>
@@ -228,6 +230,114 @@ export function RarityBadge({ rarity, className = '' }: { rarity: Rarity; classN
   )
 }
 
+export interface TabItem<T extends string> {
+  id: T
+  label: string
+  icon?: ReactNode
+  /** A count worth opening the tab for: hungry animals, live pools. */
+  badge?: ReactNode
+  badgeTone?: 'warning' | 'neutral'
+}
+
+/**
+ * One row of tabs over the workspace: the farm, and the reference tables that hang off it.
+ *
+ * They used to be modals. A modal for a table the player consults ten times a day is a door
+ * they have to keep opening; a tab keeps the sidebar, the aside and the selected plot in place
+ * while they look something up.
+ */
+export function Tabs<T extends string>({
+  items,
+  active,
+  onChange,
+  label,
+}: {
+  items: TabItem<T>[]
+  active: T
+  onChange: (id: T) => void
+  label: string
+}) {
+  const refs = useRef<Map<T, HTMLButtonElement>>(new Map())
+
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const index = items.findIndex((item) => item.id === active)
+    let next = index
+    if (event.key === 'ArrowRight') next = (index + 1) % items.length
+    else if (event.key === 'ArrowLeft') next = (index - 1 + items.length) % items.length
+    else if (event.key === 'Home') next = 0
+    else if (event.key === 'End') next = items.length - 1
+    else return
+    event.preventDefault()
+    const item = items[next]
+    if (!item) return
+    onChange(item.id)
+    refs.current.get(item.id)?.focus()
+  }
+
+  return (
+    <div
+      role="tablist"
+      aria-label={label}
+      onKeyDown={onKeyDown}
+      className="flex flex-wrap gap-1 rounded-xl border border-line bg-surface p-1 shadow-[var(--shadow-1)]"
+    >
+      {items.map((item) => {
+        const selected = item.id === active
+        return (
+          <button
+            key={item.id}
+            ref={(node) => {
+              if (node) refs.current.set(item.id, node)
+              else refs.current.delete(item.id)
+            }}
+            role="tab"
+            type="button"
+            id={`tab-${item.id}`}
+            aria-selected={selected}
+            aria-controls={`panel-${item.id}`}
+            tabIndex={selected ? 0 : -1}
+            onClick={() => onChange(item.id)}
+            className={`inline-flex min-h-8 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium transition-colors duration-150 ${
+              selected
+                ? 'bg-accent-dim text-accent'
+                : 'text-muted hover:bg-surface-2 hover:text-ink'
+            }`}
+          >
+            {item.icon}
+            {item.label}
+            {item.badge !== undefined && item.badge !== null ? (
+              <span
+                className={`tabular rounded-full px-1.5 text-xs font-semibold ${
+                  item.badgeTone === 'warning'
+                    ? 'bg-[color:var(--warning)]/15 text-[color:var(--warning)]'
+                    : 'bg-surface-3 text-muted'
+                }`}
+              >
+                {item.badge}
+              </span>
+            ) : null}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+export function TabPanel({
+  id,
+  children,
+  className = '',
+}: {
+  id: string
+  children: ReactNode
+  className?: string
+}) {
+  return (
+    <div role="tabpanel" id={`panel-${id}`} aria-labelledby={`tab-${id}`} className={className}>
+      {children}
+    </div>
+  )
+}
 
 /** Progressive disclosure for the secondary path, so it never has to become a modal. */
 export function Disclosure({
@@ -239,7 +349,7 @@ export function Disclosure({
 }) {
   return (
     <details className="group mt-3 rounded-lg border border-line bg-surface-2">
-      <summary className="flex min-h-10 list-none items-center gap-2 px-3 text-sm text-muted transition-colors duration-150 hover:text-ink [&::-webkit-details-marker]:hidden">
+      <summary className="flex min-h-9 list-none items-center gap-2 px-3 text-sm text-muted transition-colors duration-150 hover:text-ink [&::-webkit-details-marker]:hidden">
         <ChevronRight
           size={15}
           aria-hidden="true"
@@ -254,22 +364,18 @@ export function Disclosure({
 
 export function EmptyState({ title, hint }: { title: string; hint?: string }) {
   return (
-    <div className="rounded-lg border border-dashed border-line px-4 py-8 text-center">
+    <div className="rounded-lg border border-dashed border-line px-4 py-6 text-center">
       <p className="text-sm font-medium text-ink">{title}</p>
-      {hint ? <p className="mt-1 text-sm text-muted">{hint}</p> : null}
+      {hint ? <p className="mt-1 text-xs text-muted">{hint}</p> : null}
     </div>
   )
 }
 
 /**
- * The app's only dialog. Native alert/confirm are never used: they break the theme,
- * cannot be styled, and block the page.
- */
-/**
  * A panel with its chrome taken off.
  *
- * Inside a dialog the title already sits on the header, so a Card here would nest a heading in
- * a heading and a border in a border. Panels take a `bare` flag and swap this in.
+ * Inside a tab or a dialog the title already sits above, so a Card here would nest a heading
+ * in a heading and a border in a border. Panels take a `bare` flag and swap this in.
  */
 export function BareFrame({
   description,
@@ -288,6 +394,10 @@ export function BareFrame({
   )
 }
 
+/**
+ * The app's only dialog. Native alert/confirm are never used: they break the theme,
+ * cannot be styled, and block the page.
+ */
 export function Modal({
   open,
   onClose,
@@ -334,15 +444,15 @@ export function Modal({
         if (event.target === ref.current) onClose()
       }}
     >
-      <header className="flex items-center justify-between gap-3 border-b border-line px-5 py-3">
-        <h2 className="text-base font-semibold">{title}</h2>
+      <header className="flex items-center justify-between gap-3 border-b border-line px-4 py-2.5">
+        <h2 className="text-sm font-semibold">{title}</h2>
         <IconButton label="Close" onClick={onClose}>
-          <X size={18} aria-hidden="true" />
+          <X size={17} aria-hidden="true" />
         </IconButton>
       </header>
-      <div className="max-h-[75vh] overflow-y-auto scroll-thin px-5 py-4">{children}</div>
+      <div className="max-h-[75vh] overflow-y-auto scroll-thin px-4 py-3.5">{children}</div>
       {footer ? (
-        <footer className="flex justify-end gap-2 border-t border-line px-5 py-3">{footer}</footer>
+        <footer className="flex justify-end gap-2 border-t border-line px-4 py-2.5">{footer}</footer>
       ) : null}
     </dialog>
   )

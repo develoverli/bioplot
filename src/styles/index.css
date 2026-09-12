@@ -131,6 +131,28 @@
   --shadow-2: 0 12px 32px -20px oklch(0.35 0.02 155 / 0.4);
 }
 
+/*
+ * One type scale, one step tighter than Tailwind's default. The page is a control panel read
+ * at arm's length, so 13px body with 11px labels is dense without being small: every figure
+ * still sits on a 4px rhythm, and the map keeps the room.
+ */
+@theme {
+  --text-xs: 0.6875rem;
+  --text-xs--line-height: 1.35;
+  --text-sm: 0.8125rem;
+  --text-sm--line-height: 1.45;
+  --text-base: 0.875rem;
+  --text-base--line-height: 1.5;
+  --text-lg: 1rem;
+  --text-lg--line-height: 1.4;
+  --text-xl: 1.125rem;
+  --text-xl--line-height: 1.3;
+  --text-2xl: 1.375rem;
+  --text-2xl--line-height: 1.2;
+  --text-3xl: 1.75rem;
+  --text-3xl--line-height: 1.15;
+}
+
 @theme inline {
   --color-bg: var(--bg);
   --color-surface: var(--surface);
@@ -168,8 +190,8 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-sans);
-  font-size: 16px;
-  line-height: 1.55;
+  font-size: 13px;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
 

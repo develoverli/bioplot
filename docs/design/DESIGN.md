@@ -63,7 +63,9 @@ modes hold ≥4.5:1 for body text and ≥3:1 for secondary text.
 - Self-hosted through `@fontsource-variable/*`. No CDN, no external font request.
 - Every numeric cell carries `.tabular` (`font-variant-numeric: tabular-nums`) so figures do
   not jitter as the plan recomputes.
-- Body 16px / 1.55. Labels 12px uppercase with tracking. One type scale, no ad-hoc sizes.
+- Body 13px / 1.5. Labels 11px uppercase with tracking. The Tailwind scale is redefined one
+  step tighter in `@theme` (`xs` 11 · `sm` 13 · `base` 14 · `lg` 16 · `xl` 18 · `2xl` 22), so
+  components keep using `text-sm` and the whole page densifies together. No ad-hoc sizes.
 
 ## Composition
 
@@ -78,10 +80,16 @@ are separated with `divide-y`, never boxed.
 
 ## Layout
 
-- 4/8px spacing rhythm throughout; `rounded-lg` (8px) for controls, `rounded-xl` (12px) for cards.
-- `max-w-7xl` page, two columns from `xl`: results on the left, inputs in a sticky aside on
-  the right. Below `xl` the inputs come first, because you cannot read a plan you have not
-  fed yet.
+- 4/8px spacing rhythm throughout; `rounded-lg` (8px) for controls, `rounded-xl` (12px) for cards,
+  `rounded-2xl` (16px) only for the field and the tab panels that replace it.
+- One frame, always (`<WorkspaceShell>`): from `xl`, inputs in a 16rem column on the left, the
+  field in the middle, a 18rem aside on the right with the farm's summary and the selected
+  plot. The same frame renders with or without a farm, so nothing rearranges when data
+  arrives. Below `xl` the middle comes first, then the aside, then the inputs.
+- A row of tabs sits above the field: Farm, Schedule, Ranking, Animals, Pools. The reference
+  tables used to be modals; as tabs they keep the sidebar and the selected plot in place while
+  the player looks something up. Tab labels carry counts (hungry pens, live pools) so a closed
+  tab is worth opening.
 - The inventory editor uses **container queries** (`@container` / `@xl:`) rather than viewport
   breakpoints, so the same card is correct in the narrow sidebar and full width.
 - Wide tables scroll inside their own `overflow-x-auto` container. The page body never
@@ -89,16 +97,17 @@ are separated with `divide-y`, never boxed.
 
 ## Interaction
 
-- Minimum 40px control height, 40px icon buttons; every icon-only control has `aria-label`
-  and a matching `title`.
+- Minimum 36px control height, 36px icon buttons, 32px for the tab and land buttons that sit
+  inside a panel; every icon-only control has `aria-label` and a matching `title`.
 - Focus is never removed: a 2px accent ring with 2px offset on `:focus-visible`.
 - Transitions are 150ms, colour-only. Nothing animates layout. `prefers-reduced-motion`
   reduces everything to near-zero.
 - Sortable table headers expose `aria-sort` and are real buttons, keyboard-operable.
 - **No native `alert` / `confirm` / `prompt`.** The single `<Modal>` (a real `<dialog>`, with
-  Escape handling and a backdrop) exists for one job: confirming a destructive reset, where it
-  names exactly what is lost. Secondary paths use `<Disclosure>` instead, because a modal for
-  an optional flow is laziness.
+  Escape handling and a backdrop) exists for two jobs: loading a farm, and confirming a
+  destructive reset where it names exactly what is lost. Reference tables are tabs, never
+  modals. Secondary paths use `<Disclosure>` instead, because a modal for an optional flow is
+  laziness.
 - While the planner recomputes, the totals dim (`.is-stale`) rather than vanish. Numbers never
   disappear and never shift the layout.
 
@@ -112,6 +121,10 @@ matches what the player sees in game. Art is optional by construction — when t
 not been captured, or a URL fails, the bed falls back to its text label.
 
 ## Empty and error states
+
+With no farm loaded the middle of the frame is `<EmptyHero>`: what the tool will do once fed,
+and both doors to feeding it (the extension, or the manual plot editor inline). Neither door
+hides the other. The aside shows the same summary card with zeros rather than disappearing.
 
 Every list has an empty state that says what to do next, not just that something is missing.
 Import errors are `role="alert"` and always name a recovery step. The planner surfaces its own

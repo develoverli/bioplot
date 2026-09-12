@@ -4,40 +4,61 @@
     <meta charset="UTF-8" />
     <title>Bioplot</title>
     <style>
+      /*
+       * Same palette as the app (src/styles/index.css): green-tinted neutrals in OKLCH, one
+       * accent that means "ready" or "the action that gets you there". The popup is read for
+       * three seconds between two tabs, so every block answers one question and nothing repeats.
+       */
       :root {
         color-scheme: dark;
-        --bg: #0f1614;
-        --surface: #18231f;
-        --line: #27362f;
-        --text: #e9f2ee;
-        --muted: #9ab0a8;
-        --faint: #6d827b;
-        --ok: #4ade80;
-        --warn: #fbbf24;
-        --bad: #f87171;
+        --bg: oklch(0.16 0.008 155);
+        --surface: oklch(0.2 0.01 155);
+        --surface-2: oklch(0.24 0.012 155);
+        --surface-3: oklch(0.29 0.014 155);
+        --line: oklch(0.31 0.014 155);
+        --line-strong: oklch(0.42 0.018 155);
+        --text: oklch(0.95 0.012 155);
+        --muted: oklch(0.75 0.018 155);
+        --faint: oklch(0.62 0.016 155);
+        --accent: oklch(0.8 0.17 152);
+        --accent-strong: oklch(0.87 0.15 152);
+        --accent-dim: oklch(0.3 0.06 152);
+        --accent-contrast: oklch(0.18 0.03 152);
+        --warn: oklch(0.82 0.15 85);
+        --warn-dim: oklch(0.3 0.06 85);
+        --bad: oklch(0.7 0.16 25);
+        --bad-dim: oklch(0.3 0.07 25);
       }
       * {
         box-sizing: border-box;
       }
       body {
         margin: 0;
-        width: 21rem;
-        padding: 16px;
+        width: 22rem;
+        padding: 12px;
         background: var(--bg);
         color: var(--text);
-        font: 13px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif;
+        font: 13px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif;
+        -webkit-font-smoothing: antialiased;
       }
+      .tabular {
+        font-variant-numeric: tabular-nums;
+      }
+      svg {
+        display: block;
+      }
+
+      /* ---- header ------------------------------------------------------------------ */
       header {
         display: flex;
         align-items: center;
         gap: 10px;
       }
-      /* The mark is drawn, not scaled down from a 128px bitmap, so it stays crisp at 34px. */
       header svg.mark {
-        width: 34px;
-        height: 34px;
+        width: 32px;
+        height: 32px;
         flex: none;
-        border-radius: 9px;
+        border-radius: 8px;
       }
       .title {
         flex: 1;
@@ -46,176 +67,372 @@
       h1 {
         margin: 0;
         font-size: 14px;
+        font-weight: 600;
         letter-spacing: -0.01em;
+        line-height: 1.2;
       }
       .sub {
         margin: 0;
         color: var(--faint);
         font-size: 11px;
       }
-
-      /* One line that says whether this is working, in one colour. */
-      #state {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        margin-top: 12px;
-        padding: 10px 12px;
-        border: 1px solid var(--line);
-        border-radius: 10px;
-        background: var(--surface);
-        font-weight: 600;
-      }
       #dot {
-        width: 10px;
-        height: 10px;
-        flex: 0 0 auto;
+        width: 9px;
+        height: 9px;
+        flex: none;
         border-radius: 50%;
         background: var(--faint);
       }
-      #state.ok,
-      #state.warn,
-      #state.bad {
-        color: inherit;
+
+      /* ---- the one line that says whether it is working ---------------------------- */
+      #state {
+        display: grid;
+        grid-template-columns: 36px 1fr;
+        column-gap: 10px;
+        align-items: center;
+        margin-top: 12px;
+        padding: 10px 12px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--surface);
       }
-      #state.ok #dot {
-        background: var(--ok);
+      #stateIcon {
+        grid-row: 1 / span 3;
+        width: 36px;
+        height: 36px;
+        display: grid;
+        place-items: center;
+        border-radius: 50%;
+        background: var(--surface-3);
+        color: var(--muted);
+      }
+      /* SVGElement has no `hidden` property, so the visible icon is picked by class instead. */
+      #stateIcon svg {
+        display: none;
+      }
+      #state.ok #iconOk,
+      #state.warn #iconWarn,
+      #state.bad #iconBad {
+        display: block;
+      }
+      #stateText {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 600;
+        line-height: 1.25;
+      }
+      #hint {
+        grid-column: 2;
+        margin: 2px 0 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      #last {
+        grid-column: 2;
+        margin: 4px 0 0;
+        color: var(--faint);
+        font-size: 11px;
+      }
+      #state.ok {
+        border-color: var(--accent);
+        background: var(--accent-dim);
+      }
+      #state.ok #stateIcon {
+        background: var(--accent);
+        color: var(--accent-contrast);
       }
       #state.ok #stateText {
-        color: var(--ok);
+        color: var(--accent);
       }
-      #state.warn #dot {
+      #state.warn {
+        border-color: var(--warn);
+        background: var(--warn-dim);
+      }
+      #state.warn #stateIcon {
         background: var(--warn);
+        color: var(--bg);
       }
       #state.warn #stateText {
         color: var(--warn);
       }
-      #state.bad #dot {
+      #state.bad {
+        border-color: var(--bad);
+        background: var(--bad-dim);
+      }
+      #state.bad #stateIcon {
         background: var(--bad);
+        color: var(--bg);
       }
       #state.bad #stateText {
         color: var(--bad);
       }
 
+      /* ---- counts ------------------------------------------------------------------ */
       .counts {
         display: grid;
-        grid-template-columns: 1fr 1fr 1fr;
+        grid-template-columns: repeat(3, 1fr);
         gap: 8px;
         margin-top: 8px;
       }
       .count {
         margin: 0;
-        padding: 10px;
+        padding: 10px 12px;
         border: 1px solid var(--line);
-        border-radius: 10px;
+        border-radius: 12px;
         background: var(--surface);
-        text-align: center;
+      }
+      .count svg {
+        width: 18px;
+        height: 18px;
+        color: var(--accent);
       }
       .count b {
         display: block;
+        margin-top: 6px;
         font-size: 20px;
-        font-variant-numeric: tabular-nums;
-        line-height: 1.15;
+        font-weight: 600;
+        line-height: 1.1;
       }
       .count span {
         color: var(--muted);
         font-size: 11px;
       }
 
-      .hint {
-        margin: 10px 0 0;
-        color: var(--muted);
-        font-size: 12px;
-      }
-
-      .row {
+      /* ---- actions ----------------------------------------------------------------- */
+      .actions {
         display: flex;
+        flex-direction: column;
         gap: 8px;
-        margin-top: 10px;
+        margin-top: 12px;
       }
       button {
-        flex: 1;
-        min-height: 34px;
-        padding: 0 10px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-height: 36px;
+        padding: 0 12px;
         border: 1px solid var(--line);
-        border-radius: 9px;
-        background: var(--surface);
+        border-radius: 10px;
+        background: var(--surface-2);
         color: var(--text);
         font: inherit;
         font-weight: 500;
         cursor: pointer;
+        transition: background-color 150ms, border-color 150ms;
+      }
+      button svg {
+        width: 16px;
+        height: 16px;
       }
       button:hover:not(:disabled) {
-        border-color: var(--ok);
+        border-color: var(--line-strong);
+        background: var(--surface-3);
       }
       button:disabled {
         opacity: 0.45;
         cursor: not-allowed;
       }
+      button:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
       button.primary {
+        min-height: 40px;
         border-color: transparent;
-        background: var(--ok);
-        color: #06140c;
+        background: var(--accent);
+        color: var(--accent-contrast);
         font-weight: 600;
+        font-size: 14px;
       }
       button.primary:hover:not(:disabled) {
-        background: #86efac;
+        background: var(--accent-strong);
+        border-color: transparent;
+      }
+      body:not(.has-site) #primaryOpen,
+      body.has-site #primaryCopy {
+        display: none;
       }
       button.danger {
         color: var(--bad);
       }
+      button.danger:hover:not(:disabled) {
+        border-color: var(--bad);
+      }
 
-      details.tools {
+      /* ---- how it works ------------------------------------------------------------ */
+      .how {
         margin-top: 12px;
-        border-top: 1px solid var(--line);
-        padding-top: 10px;
+        padding: 10px 12px 12px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--surface);
+      }
+      .how h2 {
+        margin: 0;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--faint);
+      }
+      .steps {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        margin: 10px 0 0;
+        padding: 0;
+        list-style: none;
+      }
+      .steps li {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .steps .n {
+        display: grid;
+        place-items: center;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: var(--accent);
+        color: var(--accent-contrast);
+        font-size: 11px;
+        font-weight: 700;
+      }
+      .steps b {
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .steps span {
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.35;
+      }
+
+      /* ---- privacy row ------------------------------------------------------------- */
+      .local {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        margin-top: 8px;
+        padding: 10px 12px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--surface);
+      }
+      .local svg {
+        width: 18px;
+        height: 18px;
+        flex: none;
+        margin-top: 1px;
+        color: var(--accent);
+      }
+      .local b {
+        display: block;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .local span {
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.4;
+      }
+
+      /* ---- advanced ---------------------------------------------------------------- */
+      details.tools {
+        margin-top: 8px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--surface);
       }
       details.tools summary {
-        color: var(--faint);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 40px;
+        padding: 0 12px;
+        color: var(--text);
         cursor: pointer;
         font-size: 12px;
+        font-weight: 600;
         list-style: none;
       }
       details.tools summary::-webkit-details-marker {
         display: none;
       }
-      details.tools summary:hover {
-        color: var(--muted);
+      details.tools summary svg {
+        width: 16px;
+        height: 16px;
+        color: var(--faint);
       }
-      details.tools summary::before {
-        content: '▸ ';
+      details.tools summary .chev {
+        margin-left: auto;
+        transition: transform 150ms;
       }
-      details.tools[open] summary::before {
-        content: '▾ ';
+      details.tools[open] summary .chev {
+        transform: rotate(90deg);
       }
-
-      .links {
-        margin: 12px 0 0;
+      details.tools summary small {
+        color: var(--faint);
+        font-weight: 400;
+      }
+      .tools-body {
+        padding: 0 12px 12px;
+        border-top: 1px solid var(--line);
+      }
+      .tools-body .note {
+        margin: 10px 0 8px;
+      }
+      .row {
         display: flex;
-        gap: 10px;
-        font-size: 11px;
+        gap: 8px;
       }
-      .links a {
-        color: var(--muted);
+      .row button {
+        flex: 1;
+        min-height: 32px;
+        font-size: 12px;
       }
-      button.danger:hover:not(:disabled) {
-        border-color: var(--bad);
-      }
-      button:focus-visible {
-        outline: 2px solid var(--ok);
-        outline-offset: 2px;
+      .row + .row {
+        margin-top: 8px;
       }
 
+      /* ---- feedback + footer ------------------------------------------------------- */
       #status {
-        margin: 10px 0 0;
+        margin: 8px 0 0;
         min-height: 1.2em;
-        color: var(--ok);
+        color: var(--accent);
         font-size: 12px;
       }
       .note {
-        margin: 10px 0 0;
+        margin: 0;
         color: var(--faint);
         font-size: 11px;
+        line-height: 1.4;
+      }
+      footer {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px solid var(--line);
+        font-size: 11px;
+        color: var(--faint);
+      }
+      footer a {
+        color: var(--muted);
+        text-decoration: none;
+      }
+      footer a:hover {
+        color: var(--text);
+        text-decoration: underline;
+      }
+      footer #version {
+        margin-left: auto;
+      }
+      [hidden] {
+        display: none !important;
       }
     </style>
   </head>
@@ -237,57 +454,101 @@
       </svg>
       <span class="title">
         <h1>Bioplot</h1>
-        <p class="sub">Read-only farm reader</p>
+        <p class="sub">Farm Reader · read-only</p>
       </span>
-      <p class="sub" id="last">—</p>
+      <span id="dot" aria-hidden="true"></span>
     </header>
 
-    <p id="state"><span id="dot"></span><span id="stateText" role="status">Checking…</span></p>
+    <section id="state" aria-live="polite">
+      <span id="stateIcon" aria-hidden="true">
+        <!-- swapped by popup.js: check / clock / x -->
+        <svg id="iconOk" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+        <svg id="iconWarn" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+        <svg id="iconBad" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+      </span>
+      <p id="stateText" role="status">Checking…</p>
+      <p id="hint"></p>
+      <p id="last" class="tabular"></p>
+    </section>
 
     <div class="counts">
-      <p class="count"><b id="seeds">—</b><span>seeds</span></p>
-      <p class="count"><b id="plots">—</b><span>plots</span></p>
-      <p class="count"><b id="animals">—</b><span>animals</span></p>
+      <p class="count">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z" /><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12" /></svg>
+        <b id="seeds" class="tabular">—</b><span>seeds</span>
+      </p>
+      <p class="count">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="7" height="7" x="3" y="3" rx="1.5" /><rect width="7" height="7" x="14" y="3" rx="1.5" /><rect width="7" height="7" x="14" y="14" rx="1.5" /><rect width="7" height="7" x="3" y="14" rx="1.5" /></svg>
+        <b id="plots" class="tabular">—</b><span>plots</span>
+      </p>
+      <p class="count">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="4" r="2" /><circle cx="18" cy="8" r="2" /><circle cx="20" cy="16" r="2" /><path d="M9 10a5 5 0 0 1 5 5v3.5a3.5 3.5 0 0 1-6.84 1.045Q6.52 17.48 4.46 16.84A3.5 3.5 0 0 1 5.5 10Z" /></svg>
+        <b id="animals" class="tabular">—</b><span>animals</span>
+      </p>
     </div>
 
-    <p class="hint" id="hint"></p>
-
-    <div class="row">
-      <button id="copy" class="primary">Copy for the app</button>
-      <button id="clear" class="danger">Reset</button>
+    <div class="actions">
+      <!-- Opens the app when its address is known; otherwise the app is fed by copy and paste. -->
+      <button id="primary" class="primary">
+        <svg id="primaryOpen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></svg>
+        <svg id="primaryCopy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
+        <span id="primaryLabel">Copy for the app</span>
+      </button>
+      <button id="copy" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
+        Copy for the app
+      </button>
     </div>
+
+    <section class="how" aria-labelledby="howTitle">
+      <h2 id="howTitle">How it works</h2>
+      <ol class="steps">
+        <li><span class="n" aria-hidden="true">1</span><b>Open Chainers Farm</b><span>Enter your farm once so the reader sees it.</span></li>
+        <li><span class="n" aria-hidden="true">2</span><b>Open Bioplot</b><span>Same browser, any tab.</span></li>
+        <li><span class="n" aria-hidden="true">3</span><b>Press Sync now</b><span>In the app. The farm arrives from here.</span></li>
+      </ol>
+    </section>
+
+    <section class="local">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
+      <span>
+        <b>Your data stays local</b>
+        <span>Nothing is sent anywhere. No token, cookie or password is ever read. Everything lives in this browser profile.</span>
+      </span>
+    </section>
 
     <details class="tools">
-      <summary>Report a problem</summary>
-      <p class="note">
-        These two produce a bug report for the developers. Diagnostics describes the shape of
-        what was captured; raw is the full payload and can be large.
-      </p>
-      <div class="row">
-        <button id="copyDiag">Copy diagnostics</button>
-        <button id="copyRaw">Copy raw</button>
+      <summary>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" /><circle cx="12" cy="12" r="3" /></svg>
+        <span>Advanced <small>· reset, bug reports</small></span>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+      </summary>
+      <div class="tools-body">
+        <p class="note">
+          Diagnostics describes the shape of what was captured; raw is the full payload and can
+          be large. Both are for bug reports. Reset wipes every capture from this profile.
+        </p>
+        <div class="row">
+          <button id="copyDiag">Copy diagnostics</button>
+          <button id="copyRaw">Copy raw</button>
+        </div>
+        <div class="row">
+          <button id="clear" class="danger">Reset local farm data</button>
+        </div>
       </div>
     </details>
 
     <p id="status" role="status"></p>
 
-    <p class="note">
-      Normally you do not need Copy: open Bioplot and press <b>Sync now</b>. Copy is for
-      when the app runs in another browser — paste it there under &ldquo;Paste a capture&rdquo;.
-    </p>
-    <p class="note">
-      Nothing is sent anywhere. No token, cookie or password is ever read. Everything lives in
-      this browser profile, and Reset wipes it.
-    </p>
     <!--
       The policy pages are served by the app itself, so their address is the app's address.
-      popup.js fills these in and hides the row entirely while SITE_URL is unset, because a
-      dead "Privacy" link is worse than no link at all.
+      popup.js fills these in and hides them while SITE_URL is unset, because a dead link is
+      worse than no link at all.
     -->
-    <p class="links" id="links" hidden>
-      <a id="privacyLink" href="#" target="_blank" rel="noreferrer">Privacy</a>
-      <a id="termsLink" href="#" target="_blank" rel="noreferrer">Terms</a>
-    </p>
+    <footer>
+      <a id="privacyLink" href="#" target="_blank" rel="noreferrer" hidden>Privacy</a>
+      <a id="termsLink" href="#" target="_blank" rel="noreferrer" hidden>Terms</a>
+      <span id="version" class="tabular"></span>
+    </footer>
 
     <script src="src/seed-names.js"></script>
     <script src="src/parse.js"></script>

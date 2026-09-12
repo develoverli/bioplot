@@ -1,13 +1,16 @@
 /**
  * Where the published app lives. Set this before submitting to the store.
  *
- * The privacy policy and terms are pages of the app, so they only have an address once the app
- * has one. Left empty, the popup hides the row rather than shipping links that 404 — the store
- * listing carries the policy URL either way, and that is the copy the reviewer reads.
+ * With an address the primary button opens the app, and the privacy and terms links point at
+ * the pages it serves. Left empty, the primary button copies the capture instead and the links
+ * stay hidden, because a dead link is worse than no link at all. The store listing carries the
+ * policy URL either way, and that is the copy the reviewer reads.
  */
 const SITE_URL = ''
 
 const el = (id) => document.getElementById(id)
+
+const site = SITE_URL.replace(/\/$/, '')
 
 let captures = []
 let seen = {}
@@ -50,8 +53,8 @@ function describe() {
 
   return {
     tone: 'ok',
-    text: 'Ready to sync',
-    hint: 'Open bioplot and press Sync now.',
+    text: 'Farm captured',
+    hint: site ? 'Open Bioplot and press Sync now.' : 'Open Bioplot and press Sync now, or copy the capture for another browser.',
   }
 }
 
@@ -60,6 +63,8 @@ function render() {
   el('state').className = state.tone
   el('stateText').textContent = state.text
   el('hint').textContent = state.hint
+  el('dot').style.background =
+    state.tone === 'ok' ? 'var(--accent)' : state.tone === 'warn' ? 'var(--warn)' : 'var(--bad)'
 
   const beds = (payload?.gardens ?? []).flatMap((garden) => garden.beds ?? [])
   el('seeds').textContent = payload ? String(payload.seeds.length) : '0'
@@ -67,11 +72,15 @@ function render() {
   el('animals').textContent = String(beds.filter((bed) => bed.isAnimal).length)
 
   el('last').textContent = captures.length
-    ? new Date(Math.max(...captures.map((capture) => capture.at))).toLocaleTimeString()
-    : '—'
+    ? `Last capture ${new Date(Math.max(...captures.map((capture) => capture.at))).toLocaleTimeString()}`
+    : ''
 
   const hasAnything = captures.length > 0 || Object.keys(seen).length > 0
-  el('copy').disabled = !payload || (payload.seeds.length === 0 && payload.plots.length === 0)
+  const hasFarm = Boolean(payload) && (payload.seeds.length > 0 || payload.plots.length > 0)
+
+  // Copy is only useful once there is something to copy; opening the app is always useful.
+  el('primary').disabled = site ? false : !hasFarm
+  el('copy').disabled = !hasFarm
   el('copyDiag').disabled = !hasAnything
   el('copyRaw').disabled = captures.length === 0
   el('clear').disabled = !hasAnything
@@ -86,6 +95,10 @@ async function copy(text, label) {
   }
 }
 
+function copyCapture() {
+  if (payload) copy(JSON.stringify(payload, null, 2), 'Capture')
+}
+
 function load() {
   chrome.runtime.sendMessage({ type: 'get' }, (response) => {
     captures = Array.isArray(response?.captures) ? response.captures : []
@@ -97,9 +110,12 @@ function load() {
 
 load()
 
-el('copy').addEventListener('click', () => {
-  if (payload) copy(JSON.stringify(payload, null, 2), 'Capture')
+el('primary').addEventListener('click', () => {
+  if (site) chrome.tabs.create({ url: site })
+  else copyCapture()
 })
+
+el('copy').addEventListener('click', copyCapture)
 
 el('copyDiag').addEventListener('click', () => {
   copy(JSON.stringify(globalThis.BioplotParse.buildDiagnostics(captures, seen), null, 2), 'Diagnostics')
@@ -119,10 +135,15 @@ el('clear').addEventListener('click', () => {
   })
 })
 
-// Policy links, only once there is somewhere for them to point.
-if (SITE_URL) {
-  const site = SITE_URL.replace(/\/$/, '')
+// The primary action and the policy links depend on the app having an address.
+if (site) {
+  document.body.classList.add('has-site')
+  el('primaryLabel').textContent = 'Open Bioplot'
+  el('copy').hidden = false
   el('privacyLink').href = `${site}/privacy.html`
   el('termsLink').href = `${site}/terms.html`
-  el('links').hidden = false
+  el('privacyLink').hidden = false
+  el('termsLink').hidden = false
 }
+
+el('version').textContent = `v${chrome.runtime.getManifest().version}`

@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { Check, Leaf, Lightbulb, Lock, MousePointerClick } from 'lucide-react'
+import { Check, Leaf, Lightbulb, Lock } from 'lucide-react'
 import { buildCodeIconLookup, buildIconLookup } from '../lib/artwork'
 import { attendanceSec } from '../lib/attendance'
 import { buildFeedReport, type FarmAnimal, type FeedChoice } from '../lib/feed'
@@ -10,7 +10,8 @@ import { optimize, type Plan, type PlanEntry, type PlotPlan } from '../lib/optim
 import type { Garden, Rarity, Seed } from '../lib/types'
 import { useStore } from '../store'
 import { FarmField } from './FarmField'
-import { RarityBadge } from './ui'
+import { RarityBadge, TabPanel } from './ui'
+import { FarmSummary, PickPlotPlaceholder, WorkspaceShell } from './WorkspaceShell'
 
 const RARITY_VAR: Record<Rarity, string> = {
   common: 'var(--rarity-common)',
@@ -32,7 +33,7 @@ function LandTabs({
   onPick: (landId: string) => void
 }) {
   return (
-    <div role="tablist" aria-label="Your lands" className="flex flex-wrap gap-2">
+    <div role="tablist" aria-label="Your lands" className="flex flex-wrap gap-1.5">
       {lands.map((land) => {
         const owned = gardens.some((garden) => garden.landId === land.id)
         const active = owned && land.id === activeId
@@ -47,7 +48,7 @@ function LandTabs({
             disabled={!owned}
             onClick={() => onPick(land.id)}
             title={owned ? land.name : `${land.name} — not on your account`}
-            className={`inline-flex min-h-10 items-center gap-2 rounded-xl border px-3 text-sm font-semibold transition-colors duration-150 ${
+            className={`inline-flex min-h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold transition-colors duration-150 ${
               active
                 ? 'border-[color:var(--accent)] bg-accent-dim text-accent'
                 : owned
@@ -56,9 +57,9 @@ function LandTabs({
             }`}
           >
             {owned ? (
-              <Leaf size={15} aria-hidden="true" className={active ? '' : 'text-muted'} />
+              <Leaf size={13} aria-hidden="true" className={active ? '' : 'text-muted'} />
             ) : (
-              <Lock size={14} aria-hidden="true" />
+              <Lock size={12} aria-hidden="true" />
             )}
             {land.name}
           </button>
@@ -95,7 +96,7 @@ function BedSchedule({ entries, horizonSec }: { entries: PlanEntry[]; horizonSec
     <div>
       {/* One bar for the whole day, so idle time is visible rather than implied. */}
       <div
-        className="flex h-2.5 w-full overflow-hidden rounded-full bg-surface-3"
+        className="flex h-2 w-full overflow-hidden rounded-full bg-surface-3"
         role="img"
         aria-label={`${formatDuration(used)} of ${formatDuration(horizonSec)} planted`}
       >
@@ -111,25 +112,25 @@ function BedSchedule({ entries, horizonSec }: { entries: PlanEntry[]; horizonSec
         ))}
       </div>
 
-      <ol className="mt-3 flex flex-col gap-2">
+      <ol className="mt-2.5 flex flex-col gap-1.5">
         {steps.map((step, index) => {
           const { entry } = step
           const icon = iconFor(entry.seedId, entry.rarity)
           return (
             <li
               key={`${entry.seedId}-${entry.rarity}`}
-              className="flex items-center gap-2.5 rounded-lg bg-surface px-2.5 py-2"
+              className="flex items-center gap-2 rounded-lg bg-surface px-2 py-1.5"
             >
-              <span className="tabular w-5 shrink-0 text-center text-xs font-semibold text-faint">
+              <span className="tabular w-4 shrink-0 text-center text-xs font-semibold text-faint">
                 {index + 1}
               </span>
 
               {icon ? (
-                <img src={icon} alt="" width={32} height={32} loading="lazy" className="size-8" />
+                <img src={icon} alt="" width={28} height={28} loading="lazy" className="size-7" />
               ) : (
                 <span
                   aria-hidden="true"
-                  className="size-8 rounded border-2"
+                  className="size-7 rounded border-2"
                   style={{ borderColor: RARITY_VAR[entry.rarity] }}
                 />
               )}
@@ -298,7 +299,7 @@ function FeedLadder({ animal }: { animal: FarmAnimal }) {
 
   return (
     <div className="mt-3">
-      <p className="text-xs font-medium uppercase tracking-wide text-faint">
+      <p className="text-xs font-medium tracking-wide text-faint uppercase">
         What it eats, and what each one costs
       </p>
       <ul className="mt-1.5 flex flex-col gap-1.5">
@@ -323,10 +324,10 @@ function SelectedAnimal({ bedId }: { bedId: string }) {
   if (!animal) return null
 
   return (
-    <div className="rounded-xl border border-line bg-surface-2 p-3.5">
-      <div className="flex items-center gap-3">
+    <div className="rounded-xl border border-line bg-surface-2 p-3">
+      <div className="flex items-center gap-2.5">
         {animal.image ? (
-          <img src={animal.image} alt="" width={44} height={44} className="size-11 shrink-0" />
+          <img src={animal.image} alt="" width={40} height={40} className="size-10 shrink-0" />
         ) : null}
         <div className="min-w-0">
           <h3 className="truncate text-sm font-semibold text-ink">{animal.name}</h3>
@@ -338,19 +339,17 @@ function SelectedAnimal({ bedId }: { bedId: string }) {
       </div>
 
       {animal.feeding ? (
-        <p className="mt-3 rounded-lg bg-surface px-2.5 py-2 text-sm text-ink">
+        <p className="mt-2.5 rounded-lg bg-surface px-2.5 py-1.5 text-sm text-ink">
           Growing <span className="font-medium">{animal.feeding.replace(/_/g, ' ')}</span> right
           now. Wait for it before feeding again.
         </p>
       ) : animal.best ? null : (
-        <p className="mt-3 text-sm text-[color:var(--warning)]">
+        <p className="mt-2.5 text-sm text-[color:var(--warning)]">
           Nothing to feed this animal with yet.
         </p>
       )}
 
       <FeedLadder animal={animal} />
-
-
     </div>
   )
 }
@@ -372,17 +371,11 @@ function SelectedBed({
   if (bed?.isAnimal) return <SelectedAnimal bedId={bed.id} />
 
   if (!bed || !plotPlan) {
-    return (
-      <div className="rounded-xl border border-dashed border-line px-4 py-8 text-center">
-        <MousePointerClick size={22} aria-hidden="true" className="mx-auto text-faint" />
-        <p className="mt-2 text-sm font-medium text-ink">Pick a plot</p>
-        <p className="mt-1 text-sm text-muted">Tap any plot on the field for its planting order.</p>
-      </div>
-    )
+    return <PickPlotPlaceholder hint="Click any plot on the field for its planting order." />
   }
 
   return (
-    <div className="rounded-xl border border-line bg-surface-2 p-3.5">
+    <div className="rounded-xl border border-line bg-surface-2 p-3">
       <div className="flex items-baseline justify-between gap-2">
         <h3 className="text-sm font-semibold text-ink">{titleCase(bed.rarity)} plot</h3>
         <span
@@ -400,7 +393,7 @@ function SelectedBed({
         </span>
       </div>
 
-      <p className="tabular mt-1.5 text-xs text-faint">
+      <p className="tabular mt-1 text-xs text-faint">
         {formatBiopoints(plotPlan.biopointsPlain)} – {formatBiopoints(plotPlan.biopointsLucky)}{' '}
         <span className="font-sans">depending on criticals</span>
       </p>
@@ -412,33 +405,104 @@ function SelectedBed({
         </p>
       ) : null}
 
-      <div className="mt-3">
+      <div className="mt-2.5">
         <BedSchedule entries={plotPlan.entries} horizonSec={horizonSec} />
       </div>
     </div>
   )
 }
 
+interface Stat {
+  label: string
+  value: number
+  exact?: string
+  tone?: 'warning' | 'ink'
+}
+
 /**
- * The farm, front and centre: options on the left, field in the middle, the selected bed's
- * planting order on the right. Everything a player acts on is on one screen.
+ * The day's number, and the same number cut four ways beside it.
+ *
+ * One figure is the answer; the rest are that figure on a lucky day, on a flat one, per hour
+ * and per pool. They sit smaller, divided by hairlines, so the hierarchy survives: four equal
+ * boxes would say four things are equally important, and they are not.
+ */
+function StatsStrip({
+  headline,
+  headlineLabel,
+  stats,
+  stale,
+}: {
+  headline: number
+  headlineLabel: string
+  stats: Stat[]
+  stale: boolean
+}) {
+  return (
+    <div className={`mt-3 flex flex-wrap items-stretch gap-2 ${stale ? 'is-stale' : ''}`}>
+      <p
+        className="flex flex-col justify-center rounded-xl bg-accent-dim px-3.5 py-1.5"
+        title={formatExact(headline)}
+      >
+        <span className="text-xs font-semibold tracking-wide text-muted uppercase">
+          {headlineLabel}
+        </span>
+        <span className="flex items-baseline gap-1.5">
+          <span className="tabular text-2xl leading-none font-semibold text-accent">
+            {formatBiopoints(headline)}
+          </span>
+          <span className="text-xs font-medium text-muted">bp / day</span>
+        </span>
+      </p>
+
+      <dl className="m-0 flex min-w-0 flex-1 flex-wrap items-center divide-x divide-[color:var(--border)] rounded-xl border border-line">
+        {stats.map((stat) => (
+          <div key={stat.label} className="min-w-0 flex-1 px-3 py-1.5" title={stat.exact}>
+            <dt className="truncate text-xs text-faint">{stat.label}</dt>
+            <dd
+              className={`tabular m-0 text-sm font-semibold ${
+                stat.tone === 'warning'
+                  ? 'text-[color:var(--warning)]'
+                  : stat.tone === 'ink'
+                    ? 'text-ink'
+                    : 'text-muted'
+              }`}
+            >
+              {formatBiopoints(stat.value)}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  )
+}
+
+/**
+ * The farm, front and centre: options on the left, field in the middle, the farm's summary and
+ * the selected bed's planting order on the right. Everything a player acts on is on one screen.
  */
 export function FarmWorkspace({
   gardens,
   plan,
   catalogue: seedCatalogue,
   stale,
+  liveNumbers,
   sidebar,
-  belowField,
+  toolbar,
+  center,
+  onOpenSetup,
 }: {
   gardens: Garden[]
   plan: Plan
   /** The numbers to plan against: live where captured, docs otherwise. */
   catalogue: Seed[]
   stale: boolean
+  liveNumbers: boolean
   sidebar: ReactNode
-  /** Reference panels, as buttons, directly under the land they describe. */
-  belowField?: ReactNode
+  /** The tab row above the field. */
+  toolbar: ReactNode
+  /** When another tab is open, what replaces the field. The aside stays put. */
+  center: ReactNode | null
+  onOpenSetup: () => void
 }) {
   const catalogue = useStore((state) => state.catalogue)
   const inventory = useStore((state) => state.inventory)
@@ -589,244 +653,212 @@ export function FarmWorkspace({
   const animals = garden.beds.filter((bed) => bed.isAnimal)
   const hungry = animals.filter((bed) => !bed.plantedSeedCode).length
   const idleBeds = soil.filter((bed) => (planByBed.get(bed.id)?.entries.length ?? 0) === 0).length
+  const landName = lands.find((land) => land.id === garden.landId)?.name ?? garden.landId
+
+  const stats: Stat[] = []
+  // Luck is the difference between a flat day and a great one.
+  if (totalLucky > totalPlain) {
+    stats.push({ label: 'lucky', value: totalLucky, exact: formatExact(totalLucky), tone: 'warning' })
+    stats.push({ label: 'flat', value: totalPlain, exact: formatExact(totalPlain) })
+  }
+  // Crops and animals are two different engines; the farm is the sum.
+  if (feedReport.hasOutput) {
+    stats.push({ label: 'from plots', value: total, exact: formatExact(total) })
+    stats.push({
+      label: `from ${animals.length} animal${animals.length === 1 ? '' : 's'}`,
+      value: animalDay,
+      exact: formatExact(animalDay),
+      tone: 'ink',
+    })
+  }
+  stats.push({ label: 'per hour', value: total / (horizonSec / 3600) })
+  stats.push({ label: 'per pool', value: total / (horizonSec / 14_400) })
 
   return (
-    <section
-      aria-label="Your farm"
-      className="grid items-start gap-4 xl:grid-cols-[17rem_minmax(0,1fr)_20rem]"
-    >
-      <div className="order-3 flex flex-col gap-3 xl:order-1">{sidebar}</div>
-
-      <div className="order-1 mx-auto flex w-fit max-w-full min-w-0 flex-col gap-3 xl:order-2">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <LandTabs
-            gardens={gardens}
-            activeId={garden.landId}
-            onPick={(landId) => {
-              setActiveLand(landId)
-              setSelected(null)
-            }}
+    <WorkspaceShell
+      sidebar={sidebar}
+      aside={
+        <>
+          <FarmSummary
+            landName={landName}
+            plots={soil.length}
+            animals={animals.length}
+            lamps={garden.devices.length}
+            biopointsPerDay={total + animalDay}
+            idealGain={canImprove ? gain : 0}
+            ideal={ideal}
+            liveNumbers={liveNumbers}
+            horizonHours={horizonHours}
+            onOpenSetup={onOpenSetup}
           />
-
-          {canImprove ? (
-            <button
-              type="button"
-              role="switch"
-              aria-checked={ideal}
-              onClick={() => setShowIdealLayout(!ideal)}
-              className={`inline-flex min-h-10 items-center gap-2 rounded-xl border px-3 text-sm font-semibold transition-colors duration-150 ${
-                ideal
-                  ? 'border-[color:var(--accent)] bg-accent-dim text-accent'
-                  : 'border-line bg-surface-2 text-ink hover:border-line-strong'
-              }`}
-            >
-              <span
-                aria-hidden="true"
-                className={`flex size-4 shrink-0 items-center justify-center rounded-full border-2 ${
-                  ideal
-                    ? 'border-[color:var(--accent)] bg-accent text-[color:var(--accent-contrast)]'
-                    : 'border-line-strong'
-                }`}
-              >
-                {ideal ? <Check size={10} strokeWidth={3.5} /> : null}
-              </span>
-              <Lightbulb size={15} aria-hidden="true" />
-              Ideal lamps
-              <span className="tabular text-xs font-medium opacity-80">
-                +{formatBiopoints(gain)}
-              </span>
-            </button>
-          ) : null}
-        </div>
-
-        <div className="w-full rounded-2xl border border-line bg-surface p-3 shadow-[var(--shadow-2)]">
-          <FarmField
+          <SelectedBed
             garden={garden}
             planByBed={planByBed}
-            iconFor={iconFor}
-            iconByCode={iconByCode}
-            feedByPen={feedByPen}
-            feedNotOwned={feedNotOwned}
-            feedImpossible={feedImpossible}
             selected={selected}
-            onSelect={setSelected}
-            changedBeds={ideal ? gainedLamp : undefined}
+            horizonSec={horizonSec}
           />
+        </>
+      }
+    >
+      {toolbar}
 
-          {/*
-            One place for the numbers, right under the thing they describe. A separate strip at
-            the top of the page said all of this a second time and made the farm compete for
-            space with its own summary.
-          */}
-          <div
-            className={`mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 ${stale ? 'is-stale' : ''}`}
-          >
-            {/*
-              The headline is the farm, not one half of it. Crops and animals are separate
-              engines but a player only ever spends the sum.
-            */}
-            <p
-              className="inline-flex items-baseline gap-2 rounded-xl bg-accent-dim px-3.5 py-1.5"
-              title={formatExact(total + animalDay)}
-            >
-              <span className="text-xs font-semibold uppercase tracking-wide text-muted">
-                {ideal ? 'Ideal' : 'Now'}
-              </span>
-              <span className="tabular text-xl leading-none font-semibold text-accent">
-                {formatBiopoints(total + animalDay)}
-              </span>
-              <span className="text-xs font-medium text-muted">bp / day</span>
-            </p>
+      {center ?? (
+        <TabPanel id="farm" className="mx-auto flex w-fit max-w-full min-w-0 flex-col gap-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <LandTabs
+              gardens={gardens}
+              activeId={garden.landId}
+              onPick={(landId) => {
+                setActiveLand(landId)
+                setSelected(null)
+              }}
+            />
 
-            {/* Luck is the difference between a flat day and a great one. */}
-            {totalLucky > totalPlain ? (
-              <p
-                className="tabular text-xs text-muted"
-                title={`${formatExact(totalPlain)} to ${formatExact(totalLucky)}`}
+            {canImprove ? (
+              <button
+                type="button"
+                role="switch"
+                aria-checked={ideal}
+                onClick={() => setShowIdealLayout(!ideal)}
+                className={`inline-flex min-h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold transition-colors duration-150 ${
+                  ideal
+                    ? 'border-[color:var(--accent)] bg-accent-dim text-accent'
+                    : 'border-line bg-surface-2 text-ink hover:border-line-strong'
+                }`}
               >
-                <span className="font-semibold text-[color:var(--warning)]">
-                  {formatBiopoints(totalLucky)}
-                </span>{' '}
-                <span className="font-sans">lucky</span>
-                <span className="mx-1.5 text-faint">·</span>
-                {formatBiopoints(totalPlain)} <span className="font-sans">flat</span>
-              </p>
+                <span
+                  aria-hidden="true"
+                  className={`flex size-3.5 shrink-0 items-center justify-center rounded-full border-2 ${
+                    ideal
+                      ? 'border-[color:var(--accent)] bg-accent text-[color:var(--accent-contrast)]'
+                      : 'border-line-strong'
+                  }`}
+                >
+                  {ideal ? <Check size={9} strokeWidth={3.5} /> : null}
+                </span>
+                <Lightbulb size={13} aria-hidden="true" />
+                Ideal lamps
+                <span className="tabular font-medium opacity-80">+{formatBiopoints(gain)}</span>
+              </button>
             ) : null}
-
-            {/* Crops and animals are two different engines; the farm is the sum. */}
-            {feedReport.hasOutput ? (
-              <p className="tabular text-xs text-muted">
-                {formatBiopoints(total)} <span className="font-sans">from plots</span>
-                <span className="mx-1.5 text-faint">+</span>
-                <span className="font-semibold text-ink">{formatBiopoints(animalDay)}</span>{' '}
-                <span className="font-sans">from {animals.length} animals</span>
-              </p>
-            ) : null}
-
-            <p className="tabular text-xs text-muted">
-              {formatBiopoints(total / (horizonSec / 3600))}{' '}
-              <span className="font-sans">per hour</span>
-              <span className="mx-1.5 text-faint">·</span>
-              {formatBiopoints(total / (horizonSec / 14_400))}{' '}
-              <span className="font-sans">per pool</span>
-            </p>
-
-            <p className="tabular ml-auto text-xs text-faint">
-              {soil.length} plots
-              <span className="mx-1.5">·</span>
-              {animals.length} animals
-              <span className="mx-1.5">·</span>
-              {garden.devices.length} lamps
-            </p>
           </div>
 
-          {canImprove ? (
-            <p className="mt-2 text-xs text-muted">
+          <div className="w-full rounded-2xl border border-line bg-surface p-3 shadow-[var(--shadow-2)]">
+            <FarmField
+              garden={garden}
+              planByBed={planByBed}
+              iconFor={iconFor}
+              iconByCode={iconByCode}
+              feedByPen={feedByPen}
+              feedNotOwned={feedNotOwned}
+              feedImpossible={feedImpossible}
+              selected={selected}
+              onSelect={setSelected}
+              changedBeds={ideal ? gainedLamp : undefined}
+            />
+
+            {/*
+              One place for the numbers, right under the thing they describe. The headline is
+              the farm, not one half of it: crops and animals are separate engines but a player
+              only ever spends the sum.
+            */}
+            <StatsStrip
+              headline={total + animalDay}
+              headlineLabel={ideal ? 'Ideal' : 'Now'}
+              stats={stats}
+              stale={stale}
+            />
+
+            {canImprove ? (
+              <p className="mt-2 text-xs text-muted">
+                {ideal ? (
+                  <>
+                    Lamps shown where they should be. Dashed plots are the ones to move a lamp
+                    onto:{' '}
+                    <span className="tabular font-semibold text-accent">
+                      +{formatBiopoints(gain)}
+                    </span>{' '}
+                    bp / day. Nothing is changed in your game.
+                  </>
+                ) : (
+                  <>
+                    Your lamps as they are. Moving {lampPlan?.placements.length} of them is worth{' '}
+                    <span className="tabular font-semibold text-accent">
+                      +{formatBiopoints(gain)}
+                    </span>{' '}
+                    bp / day.
+                  </>
+                )}
+              </p>
+            ) : null}
+
+            {hungry > 0 ? (
+              <p className="mt-2 text-xs text-[color:var(--warning)]">
+                {hungry} animal{hungry === 1 ? '' : 's'} with nothing growing
+                {feedReport.hasOutput &&
+                feedReport.idealBiopointsPerDay > feedReport.biopointsPerDay ? (
+                  <>
+                    . Feeding every pen its best would add{' '}
+                    <span className="tabular font-semibold">
+                      {formatBiopoints(
+                        feedReport.idealBiopointsPerDay - feedReport.biopointsPerDay,
+                      )}
+                    </span>{' '}
+                    bp / day.
+                  </>
+                ) : (
+                  '. Feed is crafted from your harvest; the Animals tab shows what you can make.'
+                )}
+              </p>
+            ) : null}
+
+            {idleBeds > 0 ? (
+              <p className="mt-2 text-xs text-[color:var(--warning)]">
+                {idleBeds} plot{idleBeds === 1 ? '' : 's'} left empty: you do not own enough seeds
+                to fill them. One seed can only grow in one plot at a time.
+              </p>
+            ) : null}
+
+            <ul className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-faint">
+              {RARITY_ORDER.map((rarity) => (
+                <li key={rarity} className="flex items-center gap-1.5">
+                  <span
+                    aria-hidden="true"
+                    className="size-2.5 rounded-sm border-2"
+                    style={{ borderColor: RARITY_VAR[rarity] }}
+                  />
+                  {titleCase(rarity)}
+                </li>
+              ))}
+              <li className="flex items-center gap-1.5">
+                <span
+                  aria-hidden="true"
+                  className="size-2.5 rounded-full bg-[color:var(--warning)]"
+                />
+                Lamp
+              </li>
+              {animals.length > 0 ? (
+                <li className="flex items-center gap-1.5">
+                  <span
+                    aria-hidden="true"
+                    className="size-2.5 rounded-sm bg-[color:var(--grass-2)]"
+                  />
+                  Animal
+                </li>
+              ) : null}
               {ideal ? (
-                <>
-                  Lamps shown where they should be. Dashed plots are the ones to move a lamp
-                  onto:{' '}
-                  <span className="tabular font-semibold text-accent">
-                    +{formatBiopoints(gain)}
-                  </span>{' '}
-                  bp / day. Nothing is changed in your game.
-                </>
-              ) : (
-                <>
-                  Your lamps as they are. Moving {lampPlan?.placements.length} of them is worth{' '}
-                  <span className="tabular font-semibold text-accent">
-                    +{formatBiopoints(gain)}
-                  </span>{' '}
-                  bp / day.
-                </>
-              )}
-            </p>
-          ) : null}
-
-          {hungry > 0 ? (
-            <p className="mt-2 text-xs text-[color:var(--warning)]">
-              {hungry} animal{hungry === 1 ? '' : 's'} with nothing growing
-              {feedReport.hasOutput &&
-              feedReport.idealBiopointsPerDay > feedReport.biopointsPerDay ? (
-                <>
-                  {' '}
-                  — feeding every pen its best would add{' '}
-                  <span className="tabular font-semibold">
-                    {formatBiopoints(
-                      feedReport.idealBiopointsPerDay - feedReport.biopointsPerDay,
-                    )}
-                  </span>{' '}
-                  bp / day
-                </>
-              ) : (
-                '. Feed is crafted from your harvest; see what you can make below.'
-              )}
-            </p>
-          ) : null}
-
-          {idleBeds > 0 ? (
-            <p className="mt-2 text-xs text-[color:var(--warning)]">
-              {idleBeds} plot{idleBeds === 1 ? '' : 's'} left empty: you do not own enough seeds
-              to fill them. One seed can only grow in one plot at a time.
-            </p>
-          ) : null}
-
-          <ul className="mt-2 flex flex-wrap items-center gap-x-3.5 gap-y-1 text-xs text-faint">
-            {RARITY_ORDER.map((rarity) => (
-              <li key={rarity} className="flex items-center gap-1.5">
-                <span
-                  aria-hidden="true"
-                  className="size-2.5 rounded-sm border-2"
-                  style={{ borderColor: RARITY_VAR[rarity] }}
-                />
-                {titleCase(rarity)}
-              </li>
-            ))}
-            <li className="flex items-center gap-1.5">
-              <span
-                aria-hidden="true"
-                className="size-2.5 rounded-full bg-[color:var(--warning)]"
-              />
-              Lamp
-            </li>
-            {animals.length > 0 ? (
-              <li className="flex items-center gap-1.5">
-                <span
-                  aria-hidden="true"
-                  className="size-2.5 rounded-sm bg-[color:var(--grass-2)]"
-                />
-                Animal
-              </li>
-            ) : null}
-            {ideal ? (
-              <li className="flex items-center gap-1.5">
-                <span
-                  aria-hidden="true"
-                  className="size-2.5 rounded-sm border-2 border-dashed border-[color:var(--text)]"
-                />
-                Move a lamp here
-              </li>
-            ) : null}
-          </ul>
-        </div>
-
-        {/*
-          Every reference table hangs off the farm, so its door belongs under the farm rather
-          than in a strip of its own further down the page.
-        */}
-        {belowField ? (
-          <div className="flex flex-wrap items-center justify-center gap-2">{belowField}</div>
-        ) : null}
-      </div>
-
-      <div className="order-2 min-w-0 xl:order-3">
-        <SelectedBed
-          garden={garden}
-          planByBed={planByBed}
-          selected={selected}
-          horizonSec={horizonSec}
-        />
-      </div>
-    </section>
+                <li className="flex items-center gap-1.5">
+                  <span
+                    aria-hidden="true"
+                    className="size-2.5 rounded-sm border-2 border-dashed border-[color:var(--text)]"
+                  />
+                  Move a lamp here
+                </li>
+              ) : null}
+            </ul>
+          </div>
+        </TabPanel>
+      )}
+    </WorkspaceShell>
   )
 }
