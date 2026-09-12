@@ -496,6 +496,55 @@ export function perMillion(rate: number, currency: string): number {
   return (rate / 10 ** decimals) * 1_000_000
 }
 
+/** One row of a Blockscout v2 token-balance list. */
+export interface TokenBalance {
+  token: { name?: string | null; symbol?: string | null }
+  value: string
+}
+
+/**
+ * A vault's weight from what it is holding, rather than from every transfer it ever saw.
+ *
+ * Crops go into a vault and stay there: the payout at the close moves currency, never produce.
+ * So the vault's balance of a crop IS the number of units contributed, and one balance call
+ * replaces paging thousands of transfer rows. The currency itself is skipped, and a crop the
+ * catalogue cannot weigh is counted in `unknownUnits` and named, never guessed.
+ */
+export function weighBalances(
+  balances: TokenBalance[],
+  currency: string,
+  weightOf: WeightLookup,
+): { totalWeight: number; units: number; unknownUnits: number; unknown: string[]; payout: number } {
+  const coin = currencyKey(currency)
+  let totalWeight = 0
+  let units = 0
+  let unknownUnits = 0
+  let payout = 0
+  const unknown = new Set<string>()
+
+  for (const row of balances) {
+    const name = row.token?.name ?? ''
+    const symbol = (row.token?.symbol ?? '').toUpperCase()
+    const value = Number(row.value)
+    if (!Number.isFinite(value) || value <= 0) continue
+    // The block's own currency: the funding, or what is left of it after the payout.
+    if (currencyKey(symbol) !== null) {
+      if (currencyKey(symbol) === coin) payout = value
+      continue
+    }
+    units += value
+    const weight = weightOf(name)
+    if (weight === null) {
+      unknown.add(name)
+      unknownUnits += value
+    } else {
+      totalWeight += weight * value
+    }
+  }
+
+  return { totalWeight, units, unknownUnits, unknown: [...unknown].sort(), payout }
+}
+
 /** Blockscout v1 query URLs, in one place. */
 export const explorerApi = {
   blockAt: (unixSeconds: number, closest: 'before' | 'after') =>
@@ -504,6 +553,9 @@ export const explorerApi = {
     `${EXPLORER}/api?module=account&action=tokentx&contractaddress=${tokenAddress}&startblock=${startBlock}&endblock=${endBlock}&sort=asc`,
   addressTransfers: (address: string, page: number) =>
     `${EXPLORER}/api?module=account&action=tokentx&address=${address}&page=${page}&offset=10000&sort=asc`,
+  /** What a vault holds: one call, indexed, and the fast way to weigh a block. */
+  addressTokens: (address: string, cursor = '') =>
+    `${EXPLORER}/api/v2/addresses/${address}/tokens?type=ERC-20${cursor}`,
   addressPage: (address: string) => `${EXPLORER}/address/${address}`,
 }
 

@@ -35,7 +35,13 @@ export interface LampPlacement {
   h: number
   /** The tiles it actually lights, relative to (x, y). Not every box is filled. */
   offsets: Tile[]
-  /** Where the lamp itself stands, relative to (x, y). */
+  /**
+   * Where the lamp itself stands, relative to (x, y).
+   *
+   * A lamp can stand on a tile it does not light, so this is allowed to fall outside the
+   * coverage box: negative, or past its width. Rounding it into the box would redraw the lamp
+   * somewhere it never was.
+   */
   anchor: Tile
 }
 
@@ -121,12 +127,12 @@ function footprintOf(device: GardenDevice): Footprint {
     h: maxY - minY + 1,
     offsets,
     keys: new Set(offsets.map((tile) => `${tile.x},${tile.y}`)),
-    // A lamp standing outside its own coverage box would draw off the land, so it falls back
-    // to the middle of the box rather than to a position the land may not have.
-    anchor:
-      stand && stand.x >= minX && stand.x <= maxX && stand.y >= minY && stand.y <= maxY
-        ? { x: stand.x - minX, y: stand.y - minY }
-        : { x: Math.floor((maxX - minX) / 2), y: Math.floor((maxY - minY) / 2) },
+    // The real standing tile, even when it sits outside the coverage box: a lamp that lights
+    // the beds around it is often not on a lit tile itself, and clamping it into the box made
+    // the ideal view redraw an unmoved lamp one tile away. Drawing clamps to the land instead.
+    anchor: stand
+      ? { x: stand.x - minX, y: stand.y - minY }
+      : { x: Math.floor((maxX - minX) / 2), y: Math.floor((maxY - minY) / 2) },
   }
 }
 
@@ -212,12 +218,19 @@ export function planLamps(
 
 /** The same garden with the lamps where they should be, for planning and drawing. */
 export function applyLampPlan(garden: Garden, lampPlan: LampPlan): Garden {
+  // The anchor can sit outside the coverage box, so a lamp near an edge could be drawn off
+  // the land. Only the drawing is clamped; the tiles it lights are untouched.
+  const onLand = (tile: Tile): Tile => ({
+    x: Math.min(Math.max(tile.x, 0), Math.max(0, garden.width - 1)),
+    y: Math.min(Math.max(tile.y, 0), Math.max(0, garden.height - 1)),
+  })
+
   const devices: GardenDevice[] = lampPlan.placements.map((placement, index) => ({
     id: `suggested-${index}`,
     code: `${placement.rarity}_lamp_device`,
     rarity: placement.rarity,
     tiles: [
-      { x: placement.x + placement.anchor.x, y: placement.y + placement.anchor.y },
+      onLand({ x: placement.x + placement.anchor.x, y: placement.y + placement.anchor.y }),
     ],
     covered: placement.offsets.map((tile) => ({
       x: placement.x + tile.x,

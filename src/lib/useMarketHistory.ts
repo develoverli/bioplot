@@ -39,6 +39,10 @@ export interface MarketState {
   now: number
   /** Live readings of the open blocks, off the chain. */
   readings: LiveReadings
+  /** True while the open blocks are being read; false once every one has been tried. */
+  readingOpen: boolean
+  /** Currencies whose open block the chain would not give up. */
+  liveFailed: string[]
   /** Coin prices in USD, fetched, plus the player's own reference prices for unlisted coins. */
   prices: Prices | null
   manualPrices: Record<string, number>
@@ -87,6 +91,8 @@ export function useMarketHistory(): MarketState {
   const [manual, setManual] = useState(0)
   const [now, setNow] = useState(() => Date.now())
   const [readings, setReadings] = useState<LiveReadings>({})
+  const [readingOpen, setReadingOpen] = useState(true)
+  const [liveFailed, setLiveFailed] = useState<string[]>([])
   const [prices, setPrices] = useState<Prices | null>(() => loadCachedPrices())
   const [manualPrices, setManualPrices] = useState<Record<string, number>>(() => loadManualPrices())
 
@@ -184,18 +190,26 @@ export function useMarketHistory(): MarketState {
     let timer: number | undefined
 
     const read = async () => {
+      setReadingOpen(true)
+      const failed: string[] = []
       for (const key of opensKey.split('|')) {
         const [currency, closesAt] = key.split(/:(.+)/) as [string, string | undefined]
         if (!currency || !closesAt || controller.signal.aborted) continue
         try {
           const reading = await readOpenBlock({ pools, weightOf, signal: controller.signal }, currency, closesAt)
           if (controller.signal.aborted) return
-          setReadings((prev) => ({ ...prev, [currency]: reading ?? prev[currency] }))
+          if (reading) setReadings((prev) => ({ ...prev, [currency]: reading }))
+          else failed.push(currency)
         } catch {
-          // A vault that will not read yet is not an error: the capture, or the schedule, carries on.
+          // A vault the explorer will not serve is reported, not hidden: the page then says the
+          // weight is the capture's, and how old that is.
+          failed.push(currency)
         }
       }
-      if (!controller.signal.aborted) timer = window.setTimeout(() => void read(), LIVE_READ_MS)
+      if (controller.signal.aborted) return
+      setLiveFailed(failed)
+      setReadingOpen(false)
+      timer = window.setTimeout(() => void read(), LIVE_READ_MS)
     }
 
     void read()
@@ -238,6 +252,8 @@ export function useMarketHistory(): MarketState {
     snapshotBlocks,
     now,
     readings,
+    readingOpen,
+    liveFailed,
     prices,
     manualPrices,
     priceOf: lookupPrice,

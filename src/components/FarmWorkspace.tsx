@@ -466,9 +466,14 @@ function StatsStrip({
         </span>
       </p>
 
-      <dl className="m-0 flex min-w-0 flex-1 flex-wrap items-center divide-x divide-[color:var(--border)] rounded-xl border border-line">
+      {/* Six figures do not fit across a phone; stacked, each one keeps its label beside it. */}
+      <dl className="m-0 flex min-w-0 flex-1 flex-col divide-y divide-[color:var(--border)] rounded-xl border border-line md:flex-row md:items-center md:divide-x md:divide-y-0">
         {stats.map((stat) => (
-          <div key={stat.label} className="min-w-0 flex-1 px-3 py-1.5" title={stat.exact}>
+          <div
+            key={stat.label}
+            className="flex min-w-0 flex-1 items-baseline justify-between gap-2 px-3 py-1.5 md:block"
+            title={stat.exact}
+          >
             <dt className="truncate text-xs text-faint">{stat.label}</dt>
             <dd
               className={`tabular m-0 text-sm font-semibold ${

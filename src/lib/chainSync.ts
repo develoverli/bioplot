@@ -10,8 +10,10 @@ import {
   readVault,
   settledCloses,
   tokenFor,
+  weighBalances,
   type MarketBlock,
   type Snapshot,
+  type TokenBalance,
   type TokenTx,
   type WeightLookup,
 } from './chain'
@@ -156,6 +158,89 @@ async function readBlockAt(
   return { ...block, key: blockKey(currency, closeAt), closeAt }
 }
 
+function isBalanceList(value: unknown): value is { items: TokenBalance[]; next_page_params?: Record<string, unknown> | null } {
+  return (
+    typeof value === 'object' && value !== null && Array.isArray((value as { items?: unknown }).items)
+  )
+}
+
+/** Everything a vault holds, following the pages the explorer offers. */
+async function vaultBalances(
+  fetchJson: NonNullable<SyncOptions['fetchJson']>,
+  vault: string,
+  signal?: AbortSignal,
+): Promise<TokenBalance[]> {
+  const out: TokenBalance[] = []
+  let cursor = ''
+  for (let page = 0; page < 20; page += 1) {
+    const answer = await fetchJson(explorerApi.addressTokens(vault, cursor), signal)
+    if (!isBalanceList(answer)) break
+    out.push(...answer.items)
+    const next = answer.next_page_params
+    if (!next) break
+    cursor =
+      '&' +
+      new URLSearchParams(
+        Object.entries(next).map(([key, value]) => [key, String(value)]),
+      ).toString()
+  }
+  return out
+}
+
+/**
+ * What the block open right now holds, from the chain.
+ *
+ * The vault is found by the tier's payout at the block's open, then weighed from its balances:
+ * one indexed call instead of paging every transfer, which is the difference between a reading
+ * that lands in seconds and one that takes minutes. A block still filling has no payout burst
+ * to look for, so this is also the only way to read it.
+ */
+async function readOpenBlockAt(
+  fetchJson: NonNullable<SyncOptions['fetchJson']>,
+  currency: string,
+  closeAt: string,
+  blockTimeSeconds: number,
+  payoutRaw: number,
+  weightOf: WeightLookup,
+  signal?: AbortSignal,
+): Promise<MarketBlock | null> {
+  const token = tokenFor(currency)
+  if (!token) return null
+
+  const openSeconds = Date.parse(closeAt) / 1000 - blockTimeSeconds
+  const start = await blockNumberAt(fetchJson, openSeconds - 30, 'after', signal)
+  if (start === null) return null
+  await pause(PAUSE_MS, signal)
+
+  const funding = await fetchJson(
+    explorerApi.tokenTransfers(token.address, start, start + FUNDING_SPAN),
+    signal,
+  )
+  if (!isTokenTxList(funding)) return null
+  const vault = findVault(funding.result, token.address, payoutRaw)
+  if (!vault) return null
+  const fundedAt = funding.result.find((row) => row.to === vault)?.timeStamp
+  await pause(PAUSE_MS, signal)
+
+  const weighed = weighBalances(await vaultBalances(fetchJson, vault, signal), currency, weightOf)
+  return {
+    key: blockKey(currency, closeAt),
+    currency,
+    vault,
+    openAt: fundedAt ? new Date(Number(fundedAt) * 1000).toISOString() : new Date(openSeconds * 1000).toISOString(),
+    closeAt,
+    payout: weighed.payout || payoutRaw,
+    totalWeight: weighed.totalWeight,
+    // Contributions and contributors need the transfer list; a live reading does not pay for it.
+    contributions: 0,
+    contributors: 0,
+    payees: 0,
+    unknown: weighed.unknown,
+    units: weighed.units,
+    unknownUnits: weighed.unknownUnits,
+  }
+}
+
 /**
  * The shared history served next to the app, or null when there is none (local dev, a fork
  * that has not enabled the workflow). Never an error: the chain path still works without it.
@@ -266,7 +351,7 @@ export async function readOpenBlock(
   const live = pools.blocks.find((block) => blockCurrency(pools, block) === currency)
   const group = pools.groups.find((candidate) => candidate.groupCode === live?.groupCode)
   if (!live || live.payout <= 0) return null
-  const block = await readBlockAt(
+  const block = await readOpenBlockAt(
     fetchJson,
     currency,
     closesAt,

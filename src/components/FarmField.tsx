@@ -124,10 +124,18 @@ export function FarmField({
       role="img"
       aria-label={`Farm field: ${garden.beds.length} plots`}
       shapeRendering="crispEdges"
-      // Fixed height so the field never pushes the totals off screen, and a matching max
-      // width so a squarish land does not sit in a wide box of dead space.
-      className="mx-auto block h-[66vh] max-h-[66vh] min-h-64 w-full"
-      style={{ maxWidth: `calc(66vh * ${(width / height).toFixed(3)})` }}
+      /*
+        The box is the land's own shape: width from the column, height from the aspect ratio.
+        A fixed height letterboxed the map on a phone, where the width runs out long before the
+        height does. The vh cap keeps a tall land from pushing the totals off a desktop screen,
+        and the matching max width keeps the box on the ratio when that cap is what binds.
+      */
+      className="mx-auto block h-auto w-full"
+      style={{
+        aspectRatio: `${width} / ${height}`,
+        maxHeight: '72vh',
+        maxWidth: `calc(72vh * ${(width / height).toFixed(3)})`,
+      }}
     >
       <defs>
         {/* Feed you do not have is shown, but drained of colour: present, not available. */}

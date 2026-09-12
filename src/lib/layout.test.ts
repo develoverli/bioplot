@@ -92,3 +92,41 @@ describe('planLamps', () => {
     expect(stand.y).toBeLessThan(field.height)
   })
 })
+
+describe('a lamp that stands off its own coverage', () => {
+  /** A lamp on the tile above the two beds it lights: its post is outside the lit box. */
+  function garden(): Garden {
+    return {
+      code: 'free_garden',
+      landId: 'sunny-field',
+      width: 6,
+      height: 6,
+      beds: [
+        bed('a', 1, 2),
+        bed('b', 2, 2),
+      ],
+      devices: [
+        {
+          id: 'lamp',
+          code: 'rare_lamp_device',
+          rarity: 'rare',
+          tiles: [{ x: 1, y: 1 }],
+          covered: [
+            { x: 1, y: 2 },
+            { x: 2, y: 2 },
+          ],
+        },
+      ],
+    }
+  }
+
+  it('keeps the post where it stands when the plan leaves the lamp alone', () => {
+    const live = garden()
+    const plan = planLamps(live, 86_400, seeds)
+    const ideal = applyLampPlan(live, plan)
+    const drawn = ideal.devices[0]
+    expect(drawn?.covered).toEqual(live.devices[0]?.covered)
+    // The post used to jump to the middle of the lit box (y 2); it must stay at y 1.
+    expect(drawn?.tiles[0]).toEqual({ x: 1, y: 1 })
+  })
+})

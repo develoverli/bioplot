@@ -395,9 +395,13 @@ export function PoolsNow({ pools, market }: { pools: Pools; market: MarketState 
               <p className="mt-1 text-xs text-faint">
                 {weightSource === 'chain'
                   ? `Read off the chain ${readAgo === 0 ? 'just now' : `${readAgo} min ago`}; refreshes every 5 minutes.`
-                  : weightSource === 'capture'
-                    ? 'From your capture; the chain reading replaces it in a moment.'
-                    : ''}
+                  : market.readingOpen
+                    ? 'Reading the open block off the chain…'
+                    : market.liveFailed.includes(currency)
+                      ? 'The explorer would not serve this block, so the weight is your capture, which is as old as your last sync.'
+                      : weightSource === 'capture'
+                        ? 'From your capture, which is as old as your last sync.'
+                        : ''}
               </p>
 
               {entry.ready && weightSource !== 'none' ? (
