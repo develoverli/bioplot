@@ -11,6 +11,12 @@ animals out of your own browser, and tells you exactly what to plant to bank the
 
 Unofficial. Not affiliated with, endorsed by, or connected to Chainers.
 
+<p align="center">
+  <img src="docs/media/app.webp" alt="The Bioplot planner: planning window and seeds on the left, the farm in the middle, the farm summary on the right" width="880">
+  <br>
+  <sub>Inputs on the left, the farm in the middle, what the day is worth on the right. Shown before a farm is loaded.</sub>
+</p>
+
 ---
 
 ## Why this exists
@@ -61,12 +67,19 @@ anyway, and to CoinGecko for BNB and POL prices; neither carries any account dat
 
 ### The extension
 
+<img src="docs/media/popup.webp" alt="The extension popup: farm captured, 51 seeds, 6 plots, 4 animals, and a button that opens Bioplot" width="280" align="right">
+
 **Bioplot Farm Reader** is a Manifest V3 Chrome extension and it is **read-only**: it observes
 the responses the game already made, and never issues a game request, never writes, never
 signs. It never reads a token, a cookie or a password. See [PRIVACY.md](PRIVACY.md).
 
+Loading the farm page is the whole capture: plots, seeds, animals, crafting recipes and the
+reward pools arrive together. The popup says what it holds and what to do next, in one line.
+
 You do not have to take that on trust. The source is here, and an installed extension is
 ordinary unminified JavaScript: `chrome://extensions` → Developer mode → **Inspect views**.
+
+<br clear="right">
 
 ## Getting started
 
@@ -119,6 +132,7 @@ extension/       MV3 extension (inject → content-game → background → conte
 public/          favicon and the generated policy pages
 docs/design/     PRODUCT.md and DESIGN.md
 docs/            releasing guide, publishing checklist, store-listing notes, market-rate.md
+docs/media/      the screenshots this README shows
 .github/         issue and PR templates; CI, release and Pages workflows
 ```
 
