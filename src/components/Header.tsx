@@ -1,7 +1,8 @@
-import { Monitor, Moon, Sun } from 'lucide-react'
+import { Github, Monitor, Moon, Sun } from 'lucide-react'
+import { REPO_URL } from '../lib/links'
 import { useStore, type ThemeChoice } from '../store'
 import { Logo } from './Logo'
-import { IconButton } from './ui'
+import { IconButton, IconLink } from './ui'
 
 const THEME_ORDER: ThemeChoice[] = ['system', 'dark', 'light']
 
@@ -30,6 +31,10 @@ export function Header() {
         </div>
 
         <div className="flex items-center gap-1">
+          {/* Open source is a claim worth being able to check from anywhere on the page. */}
+          <IconLink label="Source on GitHub" href={REPO_URL}>
+            <Github size={17} aria-hidden="true" />
+          </IconLink>
           <IconButton
             label={label}
             onClick={() => {

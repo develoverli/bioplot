@@ -76,6 +76,32 @@ export function IconButton({
   )
 }
 
+/** IconButton's twin for somewhere to go rather than something to do. */
+export function IconLink({
+  label,
+  href,
+  className = '',
+  children,
+}: {
+  label: string
+  href: string
+  className?: string
+  children: ReactNode
+}) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer noopener"
+      aria-label={label}
+      title={label}
+      className={`inline-flex size-9 items-center justify-center rounded-lg border border-transparent text-muted transition-colors duration-150 hover:bg-surface-2 hover:text-ink active:bg-surface-3 ${className}`}
+    >
+      {children}
+    </a>
+  )
+}
+
 export function Field({
   label,
   hint,
