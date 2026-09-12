@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: test · typecheck · build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Reads the pnpm version from "packageManager" in package.json.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # scripts/ are stdlib-only; the build renders the policy pages with one of them.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      - run: pnpm typecheck
+      - run: pnpm build
+
+      - name: Extension manifest is valid and versions agree
+        run: |
+          MANIFEST=$(python -c "import json; print(json.load(open('extension/manifest.json'))['version'])")
+          PKG=$(python -c "import json; print(json.load(open('package.json'))['version'])")
+          echo "extension/manifest.json: $MANIFEST · package.json: $PKG"
+          if [ "$MANIFEST" != "$PKG" ]; then
+            echo "::error::extension/manifest.json ($MANIFEST) and package.json ($PKG) disagree on the version"
+            exit 1
+          fi

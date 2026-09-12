@@ -1,0 +1,73 @@
+{
+  "manifest_version": 3,
+  "name": "Bioplot Farm Reader",
+  "version": "0.1.0",
+  "description": "Reads your Chainers Farm inventory inside your own browser and hands it to Bioplot. Read-only: it never plants, never writes, and nothing leaves your machine.",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://chainers.io/*",
+    "https://*.chainers.io/*"
+  ],
+  "background": {
+    "service_worker": "src/background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chainers.io/*",
+        "https://*.chainers.io/*"
+      ],
+      "js": [
+        "src/inject.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN",
+      "all_frames": true,
+      "match_about_blank": true
+    },
+    {
+      "matches": [
+        "https://chainers.io/*",
+        "https://*.chainers.io/*"
+      ],
+      "js": [
+        "src/seed-names.js",
+        "src/parse.js",
+        "src/content-game.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true,
+      "match_about_blank": true
+    },
+    {
+      "matches": [
+        "http://localhost/*",
+        "http://127.0.0.1/*"
+      ],
+      "js": [
+        "src/seed-names.js",
+        "src/parse.js",
+        "src/content-app.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "Bioplot Farm Reader",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  }
+}

@@ -1,0 +1,230 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/jetbrains-mono';
+
+/*
+ * A farmer checking their plots between 4-hour reward pools, usually late, usually on a
+ * bright monitor in a dim room. That scene wants a dark control panel, not a document.
+ *
+ * Colour strategy: restrained. Every neutral is tinted toward the farm's green hue so the
+ * greys never read as dead browser grey, and exactly one saturated colour exists. It means
+ * biopoints, or the action that produces them. Nothing else is allowed to be green.
+ */
+:root {
+  color-scheme: dark;
+
+  --bg: oklch(0.16 0.008 155);
+  --surface: oklch(0.2 0.01 155);
+  --surface-2: oklch(0.24 0.012 155);
+  --surface-3: oklch(0.29 0.014 155);
+  --border: oklch(0.31 0.014 155);
+  --border-strong: oklch(0.42 0.018 155);
+
+  --text: oklch(0.95 0.012 155);
+  --text-muted: oklch(0.75 0.018 155);
+  --text-faint: oklch(0.62 0.016 155);
+
+  --accent: oklch(0.8 0.17 152);
+  --accent-strong: oklch(0.87 0.15 152);
+  --accent-dim: oklch(0.3 0.06 152);
+  --accent-contrast: oklch(0.18 0.03 152);
+
+  --danger: oklch(0.7 0.16 25);
+  --warning: oklch(0.82 0.15 85);
+
+  /* The map is the one place with earth in it: soil should read as soil, not as chrome. */
+  --soil: oklch(0.28 0.028 70);
+  --soil-line: oklch(0.36 0.03 70);
+  --grass: oklch(0.34 0.05 140);
+  --grass-2: oklch(0.4 0.06 140);
+  /* A bed is worked earth: lighter than the field around it, so it reads as raised. */
+  --bed: oklch(0.42 0.045 70);
+  --bed-line: oklch(0.5 0.05 70);
+
+  --rarity-common: oklch(0.72 0.012 155);
+  --rarity-uncommon: oklch(0.8 0.17 152);
+  --rarity-rare: oklch(0.74 0.14 250);
+  --rarity-epic: oklch(0.74 0.16 305);
+  --rarity-legendary: oklch(0.82 0.15 80);
+
+  --shadow-1: 0 1px 2px oklch(0.1 0.01 155 / 0.5);
+  --shadow-2: 0 10px 30px -16px oklch(0.08 0.01 155 / 0.8);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) {
+    color-scheme: light;
+
+    --bg: oklch(0.975 0.006 155);
+    --surface: oklch(0.995 0.003 155);
+    --surface-2: oklch(0.96 0.008 155);
+    --surface-3: oklch(0.93 0.01 155);
+    --border: oklch(0.9 0.01 155);
+    --border-strong: oklch(0.8 0.014 155);
+
+    --text: oklch(0.24 0.02 155);
+    --text-muted: oklch(0.46 0.02 155);
+    --text-faint: oklch(0.56 0.018 155);
+
+    --accent: oklch(0.55 0.14 152);
+    --accent-strong: oklch(0.47 0.13 152);
+    --accent-dim: oklch(0.93 0.05 152);
+    --accent-contrast: oklch(0.99 0.01 152);
+
+    --danger: oklch(0.52 0.19 27);
+    --warning: oklch(0.55 0.12 75);
+
+    --soil: oklch(0.72 0.055 70);
+    --soil-line: oklch(0.63 0.06 70);
+    --grass: oklch(0.78 0.09 140);
+    --grass-2: oklch(0.84 0.1 140);
+    --bed: oklch(0.85 0.05 70);
+    --bed-line: oklch(0.74 0.06 70);
+
+    --rarity-common: oklch(0.5 0.012 155);
+    --rarity-uncommon: oklch(0.52 0.14 152);
+    --rarity-rare: oklch(0.48 0.19 260);
+    --rarity-epic: oklch(0.5 0.22 300);
+    --rarity-legendary: oklch(0.55 0.12 75);
+
+    --shadow-1: 0 1px 2px oklch(0.4 0.02 155 / 0.1);
+    --shadow-2: 0 12px 32px -20px oklch(0.35 0.02 155 / 0.4);
+  }
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --soil: oklch(0.72 0.055 70);
+  --soil-line: oklch(0.63 0.06 70);
+  --grass: oklch(0.78 0.09 140);
+  --grass-2: oklch(0.84 0.1 140);
+  --bed: oklch(0.85 0.05 70);
+  --bed-line: oklch(0.74 0.06 70);
+
+  --bg: oklch(0.975 0.006 155);
+  --surface: oklch(0.995 0.003 155);
+  --surface-2: oklch(0.96 0.008 155);
+  --surface-3: oklch(0.93 0.01 155);
+  --border: oklch(0.9 0.01 155);
+  --border-strong: oklch(0.8 0.014 155);
+
+  --text: oklch(0.24 0.02 155);
+  --text-muted: oklch(0.46 0.02 155);
+  --text-faint: oklch(0.56 0.018 155);
+
+  --accent: oklch(0.55 0.14 152);
+  --accent-strong: oklch(0.47 0.13 152);
+  --accent-dim: oklch(0.93 0.05 152);
+  --accent-contrast: oklch(0.99 0.01 152);
+
+  --danger: oklch(0.52 0.19 27);
+  --warning: oklch(0.55 0.12 75);
+
+  --rarity-common: oklch(0.5 0.012 155);
+  --rarity-uncommon: oklch(0.52 0.14 152);
+  --rarity-rare: oklch(0.48 0.19 260);
+  --rarity-epic: oklch(0.5 0.22 300);
+  --rarity-legendary: oklch(0.55 0.12 75);
+
+  --shadow-1: 0 1px 2px oklch(0.4 0.02 155 / 0.1);
+  --shadow-2: 0 12px 32px -20px oklch(0.35 0.02 155 / 0.4);
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+
+  --color-ink: var(--text);
+  --color-muted: var(--text-muted);
+  --color-faint: var(--text-faint);
+
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-dim: var(--accent-dim);
+  --color-accent-contrast: var(--accent-contrast);
+
+  --color-danger: var(--danger);
+  --color-warning: var(--warning);
+  --color-soil: var(--soil);
+  --color-grass: var(--grass);
+
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+html {
+  background: var(--bg);
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Numbers must not jitter as the plan recomputes. */
+.tabular {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+  letter-spacing: -0.01em;
+}
+
+:where(a) {
+  color: var(--accent);
+  text-underline-offset: 3px;
+}
+
+:where(button, a, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+:where(button, summary) {
+  cursor: pointer;
+  font: inherit;
+}
+
+:where(button:disabled) {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+/* While the planner catches up with a change, the numbers dim instead of disappearing. */
+.is-stale {
+  opacity: 0.55;
+  transition: opacity 200ms var(--ease-out-quint);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

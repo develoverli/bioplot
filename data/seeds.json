@@ -1,0 +1,1358 @@
+{
+  "source": "https://docs.chainers.io/chainers-docs/chainers/chainers-farm/seeds",
+  "extractedAt": "2026-09-02",
+  "seeds": [
+    {
+      "id": "bamboo-seed",
+      "name": "Bamboo Seed",
+      "type": "Disposable",
+      "medium": "soil",
+      "renewable": false,
+      "variants": {
+        "common": {
+          "biopoints": 86,
+          "growthSec": 46800
+        },
+        "uncommon": {
+          "biopoints": 193,
+          "growthSec": 46200
+        },
+        "rare": {
+          "biopoints": 2166,
+          "growthSec": 45600
+        },
+        "epic": {
+          "biopoints": 5772,
+          "growthSec": 44400
+        },
+        "legendary": {
+          "biopoints": 14832,
+          "growthSec": 43200
+        }
+      }
+    },
+    {
+      "id": "basil-seed",
+      "name": "Basil Seed",
+      "type": "Seasonal",
+      "medium": "soil",
+      "renewable": true,
+      "variants": {
+        "common": {
+          "biopoints": 37,
+          "growthSec": 1461
+        },
+        "uncommon": {
+          "biopoints": 9594,
+          "growthSec": 23400
+        },
+        "rare": {
+          "biopoints": 12192,
+          "growthSec": 28800
+        },
+        "epic": {
+          "biopoints": 15105,
+          "growthSec": 34200
+        },
+        "legendary": {
+          "biopoints": 17754,
+          "growthSec": 39600
+        }
+      }
+    },
+    {
+      "id": "bell-pepper-seed",
+      "name": "Bell Pepper Seed",
+      "type": "Basic",
+      "medium": "soil",
+      "renewable": true,
+      "variants": {
+        "common": {
+          "biopoints": 29,
+          "growthSec": 3780
+        },
+        "uncommon": {
+          "biopoints": 58,
+          "growthSec": 3780
+        },
+        "rare": {
+          "biopoints": 119,
+          "growthSec": 3780
+        },
+        "epic": {
+          "biopoints": 234,
+          "growthSec": 3780
+        },
+        "legendary": {
+          "biopoints": 335,
+          "growthSec": 3780
+        }
+      }
+    },
+    {
+      "id": "black-lotus-seed",
+      "name": "Black Lotus Seed",
+      "type": "Limited",
+      "medium": "soil",
+      "renewable": true,
+      "variants": {
+        "common": {
+          "biopoints": 400,
+          "growthSec": 43200
+        },
+        "uncommon": {
+          "biopoints": 900,
+          "growthSec": 43200
+        },
+        "rare": {
+          "biopoints": 2100,
+          "growthSec": 43200
+        },
+        "epic": {
+          "biopoints": 4800,
+          "growthSec": 43200
+        },
+        "legendary": {
+          "biopoints": 10050,
+          "growthSec": 43200
+        }
+      }
+    },
+    {
+      "id": "blueberry-seed",
+      "name": "Blueberry Seed",
+      "type": "Limited",
+      "medium": "soil",
+      "renewable": true,
+      "variants": {
+        "common": {
+          "biopoints": 47,
+          "growthSec": 5400
+        },
+        "uncommon": {
+          "biopoints": 83,
+          "growthSec": 5100
+        },
+        "rare": {
+          "biopoints": 250,
+          "growthSec": 4800
+        },
+        "epic": {
+          "biopoints": 475,
+          "growthSec": 4200
+        },
+        "legendary": {
+          "biopoints": 827,
+          "growthSec": 3600
+        }
+      }
+    },
+    {
+      "id": "broccoli-seed",
+      "name": "Broccoli Seed",
+      "type": "Basic",
+      "medium": "soil",
+      "renewable": true,
+      "variants": {
+        "common": {
+          "biopoints": 142,
+          "growthSec": 19680
+        },
+        "uncommon": {
+          "biopoints": 280,
+          "growthSec": 19680
+        },
+        "rare": {
+          "biopoints": 569,
+          "growthSec": 19680
+        },
+        "epic": {
+          "biopoints": 1137,
+          "growthSec": 19680
+        },
+        "legendary": {
+          "biopoints": 2282,
+          "growthSec": 19680
+        }
+      }
+    },
+    {
+      "id": "cabbage-seed",
+      "name": "Cabbage Seed",
+      "type": "Basic",
+      "medium": "soil",
+      "renewable": true,
+      "variants": {
+        "common": {
+          "biopoints": 3,
+          "growthSec": 780
+        },
+        "uncommon": {
+          "biopoints": 5,
+          "growthSec": 780
+        },
+        "rare": {
+          "biopoints": 8,
+          "growthSec": 780
+        },
+        "epic": {
+          "biopoints": 13,
+          "growthSec": 780
+        },
+        "legendary": {
+          "biopoints": 21,
+          "growthSec": 780
+        }
+      }
+    },
+    {
+      "id": "cauliflower-seed",
+      "name": "Cauliflower Seed",
+      "type": "Basic",
+      "medium": "soil",
+      "renewable": true,
+      "variants": {
+        "common": {
+          "biopoints": 15,
+          "growthSec": 1920
+        },
+        "uncommon": {
+          "biopoints": 27,
+          "growthSec": 1920
+        },
+        "rare": {
+          "biopoints": 61,
+          "growthSec": 1920
+        },
+        "epic": {
+          "biopoints": 113,
+          "growthSec": 1920
+        },
+        "legendary": {
+          "biopoints": 219,
+          "growthSec": 1920
+        }
+      }
+    },
+    {
+      "id": "chili-pepper-seed",
+      "name": "Chili Pepper Seed",
+      "type": "Basic",
+      "medium": "soil",
+      "renewable": true,
+      "variants": {
+        "common": {
+          "biopoints": 81,
+          "growthSec": 10860
+        },
+        "uncommon": {
+          "biopoints": 159,
+          "growthSec": 10860
+        },
+        "rare": {
+          "biopoints": 320,
+          "growthSec": 10860
+        },
+        "epic": {
+          "biopoints": 637,
+          "growthSec": 10860
+        },
+        "legendary": {
+          "biopoints": 1285,
+          "growthSec": 10860
+        }
+      }
+    },
+    {
+      "id": "corn-seed",
+      "name": "Corn Seed",
+      "type": "Basic",
+      "medium": "soil",
+      "renewable": true,
+      "variants": {
+        "common": {
+          "biopoints": 2,
+          "growthSec": 360
+        },
+        "uncommon": {
+          "biopoints": 3,
+          "growthSec": 360
+        },
+        "rare": {
+          "biopoints": 4,
+          "growthSec": 360
+        },
+        "epic": {
+          "biopoints": 5,
+          "growthSec": 360
+        },
+        "legendary": {
+          "biopoints": 9,
+          "growthSec": 360
+        }
+      }
+    },
+    {
+      "id": "cucumber-seed",
+      "name": "Cucumber Seed",
+      "type": "Limited",
+      "medium": "soil",
+      "renewable": true,
+      "variants": {
+        "common": {
+          "biopoints": 11,
+          "growthSec": 900
+        },
+        "uncommon": {
+          "biopoints": 16,
+          "growthSec": 840
+        },
+        "rare": {
+          "biopoints": 32,
+          "growthSec": 780
+        },
+        "epic": {
+          "biopoints": 65,
+          "growthSec": 720
+        },
+        "legendary": {
+          "biopoints": 107,
+          "growthSec": 600
+        }
+      }
+    },
+    {
+      "id": "daikon-seed",
+      "name": "Daikon Seed",
+      "type": "Basic",
+      "medium": "soil",
+      "renewable": true,
+      "variants": {
+        "common": {
+          "biopoints": 95,
+          "growthSec": 12900
+        },
+        "uncommon": {
+          "biopoints": 189,
+          "growthSec": 12900
+        },
+        "rare": {
+          "biopoints": 376,
+          "growthSec": 12900
+        },
+        "epic": {
+          "biopoints": 759,
+          "growthSec": 12900
+        },
+        "legendary": {
+          "biopoints": 1532,
+          "growthSec": 12900
+        }
+      }
+    },
+    {
+      "id": "eggplant-seed",
+      "name": "Eggplant Seed",
+      "type": "Basic",
+      "medium": "soil",
+      "renewable": true,
+      "variants": {
+        "common": {
+          "biopoints": 8,
+          "growthSec": 1020
+        },
+        "uncommon": {
+          "biopoints": 18,
+          "growthSec": 1020
+        },
+        "rare": {
+          "biopoints": 30,
+          "growthSec": 1020
+        },
+        "epic": {
+          "biopoints": 61,
+          "growthSec": 1020
+        },
+        "legendary": {
+          "biopoints": 129,
+          "growthSec": 1020
+        }
+      }
+    },
+    {
+      "id": "garlic-seed",
+      "name": "Garlic Seed",
+      "type": "Basic",
+      "medium": "soil",
+      "renewable": true,
+      "variants": {
+        "common": {
+          "biopoints": 36,
+          "growthSec": 4680
+        },
+        "uncommon": {
+          "biopoints": 59,
+          "growthSec": 4680
+        },
+        "rare": {
+          "biopoints": 117,
+          "growthSec": 4680
+        },
+        "epic": {
+          "biopoints": 232,
+          "growthSec": 4680
+        },
+        "legendary": {
+          "biopoints": 405,
+          "growthSec": 4680
+        }
+      }
+    },
+    {
+      "id": "ginger-seed",
+      "name": "Ginger Seed",
+      "type": "Basic",
+      "medium": "soil",
+      "renewable": true,
+      "variants": {
+        "common": {
+          "biopoints": 198,
+          "growthSec": 28140
+        },
+        "uncommon": {
+          "biopoints": 402,
+          "growthSec": 28140
+        },
+        "rare": {
+          "biopoints": 793,
+          "growthSec": 28140
+        },
+        "epic": {
+          "biopoints": 1587,
+          "growthSec": 28140
+        },
+        "legendary": {
+          "biopoints": 3161,
+          "growthSec": 28140
+        }
+      }
+    },
+    {
+      "id": "gomphrena-seed",
+      "name": "Gomphrena Seed",
+      "type": "Limited",
+      "medium": "soil",
+      "renewable": true,
+      "variants": {
+        "common": {
+          "biopoints": 1654,
+          "growthSec": 6300
+        },
+        "uncommon": {
+          "biopoints": 2805,
+          "growthSec": 9900
+        },
+        "rare": {
+          "biopoints": 4740,
+          "growthSec": 14400
+        },
+        "epic": {
+          "biopoints": 7088,
+          "growthSec": 18900
+        },
+        "legendary": {
+          "biopoints": 10920,
+          "growthSec": 25200
+        }
+      }
+    },
+    {
+      "id": "holly-seed",
+      "name": "Holly Seed",
+      "type": "Basic",
+      "medium": "soil",
+      "renewable": true,
+      "variants": {
+        "common": {
+          "biopoints": 91,
+          "growthSec": 10800
+        },
+        "uncommon": {
+          "biopoints": 184,
+          "growthSec": 10800
+        },
+        "rare": {
+          "biopoints": 372,
+          "growthSec": 10800
+        },
+        "epic": {
+          "biopoints": 747,
+          "growthSec": 10800
+        },
+        "legendary": {
+          "biopoints": 1498,
+          "growthSec": 10800
+        }
+      }
+    },
+    {
+      "id": "hyacinth-seed",
+      "name": "Hyacinth Seed",
+      "type": "Disposable",
+      "medium": "soil",
+      "renewable": false,
+      "variants": {
+        "common": {
+          "biopoints": 36,
+          "growthSec": 14400
+        },
+        "uncommon": {
+          "biopoints": 104,
+          "growthSec": 13800
+        },
+        "rare": {
+          "biopoints": 656,
+          "growthSec": 12900
+        },
+        "epic": {
+          "biopoints": 1640,
+          "growthSec": 12000
+        },
+        "legendary": {
+          "biopoints": 3798,
+          "growthSec": 10800
+        }
+      }
+    },
+    {
+      "id": "jack-pumpkin-seed",
+      "name": "Jack Pumpkin Seed",
+      "type": "Limited",
+      "medium": "soil",
+      "renewable": true,
+      "variants": {
+        "common": {
+          "biopoints": 750,
+          "growthSec": 86400
+        },
+        "uncommon": {
+          "biopoints": 1450,
+          "growthSec": 72000
+        },
+        "rare": {
+          "biopoints": 3060,
+          "growthSec": 57600
+        },
+        "epic": {
+          "biopoints": 5210,
+          "growthSec": 43200
+        },
+        "legendary": {
+          "biopoints": 7360,
+          "growthSec": 28800
+        }
+      }
+    },
+    {
+      "id": "jasmine-seed",
+      "name": "Jasmine Seed",
+      "type": "Limited",
+      "medium": "soil",
+      "renewable": true,
+      "variants": {
+        "common": {
+          "biopoints": 960,
+          "growthSec": 3600
+        },
+        "uncommon": {
+          "biopoints": 3150,
+          "growthSec": 10800
+        },
+        "rare": {
+          "biopoints": 6142,
+          "growthSec": 18900
+        },
+        "epic": {
+          "biopoints": 9900,
+          "growthSec": 27000
+        },
+        "legendary": {
+          "biopoints": 15000,
+          "growthSec": 36000
+        }
+      }
+    },
+    {
+      "id": "juvenile-trout",
+      "name": "Juvenile Trout",
+      "type": "Seasonal Food Seed",
+      "medium": "water",
+      "renewable": true,
+      "variants": {
+        "common": {
+          "biopoints": 381,
+          "growthSec": 876
+        },
+        "uncommon": {
+          "biopoints": 768,
+          "growthSec": 1752
+        },
+        "rare": {
+          "biopoints": 1553,
+          "growthSec": 3504
+        },
+        "epic": {
+          "biopoints": 3154,
+          "growthSec": 7008
+        },
+        "legendary": {
+          "biopoints": 6424,
+          "growthSec": 14016
+        }
+      }
+    },
+    {
+      "id": "lavender-seed",
+      "name": "Lavender Seed",
+      "type": "Limited",
+      "medium": "soil",
+      "renewable": true,
+      "variants": {
+        "common": {
+          "biopoints": 244,
+          "growthSec": 900
+        },
+        "uncommon": {
+          "biopoints": 3510,
+          "growthSec": 11700
+        },
+        "rare": {
+          "biopoints": 7507,
+          "growthSec": 23400
+        },
+        "epic": {
+          "biopoints": 12577,
+          "growthSec": 35100
+        },
+        "legendary": {
+          "biopoints": 18720,
+          "growthSec": 46800
+        }
+      }
+    },
+    {
+      "id": "leek-seed",
+      "name": "Leek Seed",
+      "type": "Basic",
+      "medium": "soil",
+      "renewable": true,
+      "variants": {
+        "common": {
+          "biopoints": 21,
+          "growthSec": 2700
+        },
+        "uncommon": {
+          "biopoints": 43,
+          "growthSec": 2700
+        },
+        "rare": {
+          "biopoints": 82,
+          "growthSec": 2700
+        },
+        "epic": {
+          "biopoints": 165,
+          "growthSec": 2700
+        },
+        "legendary": {
+          "biopoints": 337,
+          "growthSec": 2700
+        }
+      }
+    },
+    {
+      "id": "mangold-seed",
+      "name": "Mangold Seed",
+      "type": "Basic",
+      "medium": "soil",
+      "renewable": true,
+      "variants": {
+        "common": {
+          "biopoints": 41,
+          "growthSec": 5400
+        },
+        "uncommon": {
+          "biopoints": 80,
+          "growthSec": 5400
+        },
+        "rare": {
+          "biopoints": 163,
+          "growthSec": 5400
+        },
+        "epic": {
+          "biopoints": 325,
+          "growthSec": 5400
+        },
+        "legendary": {
+          "biopoints": 646,
+          "growthSec": 5400
+        }
+      }
+    },
+    {
+      "id": "marigold-seed",
+      "name": "Marigold Seed",
+      "type": "Disposable",
+      "medium": "soil",
+      "renewable": false,
+      "variants": {
+        "common": {
+          "biopoints": 1,
+          "growthSec": 180
+        },
+        "uncommon": {
+          "biopoints": 2,
+          "growthSec": 150
+        },
+        "rare": {
+          "biopoints": 7,
+          "growthSec": 120
+        },
+        "epic": {
+          "biopoints": 13,
+          "growthSec": 90
+        },
+        "legendary": {
+          "biopoints": 22,
+          "growthSec": 60
+        }
+      }
+    },
+    {
+      "id": "melon-seed",
+      "name": "Melon Seed",
+      "type": "Limited",
+      "medium": "soil",
+      "renewable": true,
+      "variants": {
+        "common": {
+          "biopoints": 170,
+          "growthSec": 18000
+        },
+        "uncommon": {
+          "biopoints": 320,
+          "growthSec": 17400
+        },
+        "rare": {
+          "biopoints": 660,
+          "growthSec": 16800
+        },
+        "epic": {
+          "biopoints": 1200,
+          "growthSec": 15600
+        },
+        "legendary": {
+          "biopoints": 3600,
+          "growthSec": 14400
+        }
+      }
+    },
+    {
+      "id": "mint-seed",
+      "name": "Mint Seed",
+      "type": "Limited",
+      "medium": "soil",
+      "renewable": true,
+      "variants": {
+        "common": {
+          "biopoints": 30,
+          "growthSec": 3600
+        },
+        "uncommon": {
+          "biopoints": 74,
+          "growthSec": 3300
+        },
+        "rare": {
+          "biopoints": 140,
+          "growthSec": 3000
+        },
+        "epic": {
+          "biopoints": 250,
+          "growthSec": 2400
+        },
+        "legendary": {
+          "biopoints": 360,
+          "growthSec": 1800
+        }
+      }
+    },
+    {
+      "id": "new-dragon-fruit-seeds",
+      "name": "New Dragon Fruit Seeds",
+      "type": "Limited (2026)",
+      "medium": "soil",
+      "renewable": true,
+      "variants": {
+        "common": {
+          "biopoints": 1350,
+          "growthSec": 90000
+        },
+        "uncommon": {
+          "biopoints": 2300,
+          "growthSec": 75600
+        },
+        "rare": {
+          "biopoints": 3750,
+          "growthSec": 61200
+        },
+        "epic": {
+          "biopoints": 6000,
+          "growthSec": 46800
+        },
+        "legendary": {
+          "biopoints": 8400,
+          "growthSec": 32400
+        }
+      }
+    },
+    {
+      "id": "onion-seed",
+      "name": "Onion Seed",
+      "type": "Basic",
+      "medium": "soil",
+      "renewable": true,
+      "variants": {
+        "common": {
+          "biopoints": 7,
+          "growthSec": 900
+        },
+        "uncommon": {
+          "biopoints": 13,
+          "growthSec": 900
+        },
+        "rare": {
+          "biopoints": 26,
+          "growthSec": 900
+        },
+        "epic": {
+          "biopoints": 52,
+          "growthSec": 900
+        },
+        "legendary": {
+          "biopoints": 108,
+          "growthSec": 900
+        }
+      }
+    },
+    {
+      "id": "patisson-seed",
+      "name": "Patisson Seed",
+      "type": "Limited",
+      "medium": "soil",
+      "renewable": true,
+      "variants": {
+        "common": {
+          "biopoints": 24,
+          "growthSec": 14400
+        },
+        "uncommon": {
+          "biopoints": 115,
+          "growthSec": 13800
+        },
+        "rare": {
+          "biopoints": 528,
+          "growthSec": 13200
+        },
+        "epic": {
+          "biopoints": 1575,
+          "growthSec": 12600
+        },
+        "legendary": {
+          "biopoints": 3090,
+          "growthSec": 12000
+        }
+      }
+    },
+    {
+      "id": "peas-seed",
+      "name": "Peas Seed",
+      "type": "Basic",
+      "medium": "soil",
+      "renewable": true,
+      "variants": {
+        "common": {
+          "biopoints": 1,
+          "growthSec": 240
+        },
+        "uncommon": {
+          "biopoints": 2,
+          "growthSec": 240
+        },
+        "rare": {
+          "biopoints": 3,
+          "growthSec": 240
+        },
+        "epic": {
+          "biopoints": 4,
+          "growthSec": 240
+        },
+        "legendary": {
+          "biopoints": 7,
+          "growthSec": 240
+        }
+      }
+    },
+    {
+      "id": "physalis-seed",
+      "name": "Physalis Seed",
+      "type": "Seasonal",
+      "medium": "soil",
+      "renewable": true,
+      "variants": {
+        "common": {
+          "biopoints": 138,
+          "growthSec": 10380
+        },
+        "uncommon": {
+          "biopoints": 1245,
+          "growthSec": 31140
+        },
+        "rare": {
+          "biopoints": 4410,
+          "growthSec": 31500
+        },
+        "epic": {
+          "biopoints": 15300,
+          "growthSec": 36000
+        },
+        "legendary": {
+          "biopoints": 19000,
+          "growthSec": 43512
+        }
+      }
+    },
+    {
+      "id": "pineapple-seed",
+      "name": "Pineapple Seed",
+      "type": "Limited",
+      "medium": "soil",
+      "renewable": true,
+      "variants": {
+        "common": {
+          "biopoints": 250,
+          "growthSec": 25200
+        },
+        "uncommon": {
+          "biopoints": 500,
+          "growthSec": 23400
+        },
+        "rare": {
+          "biopoints": 1000,
+          "growthSec": 21600
+        },
+        "epic": {
+          "biopoints": 2000,
+          "growthSec": 19800
+        },
+        "legendary": {
+          "biopoints": 4510,
+          "growthSec": 18000
+        }
+      }
+    },
+    {
+      "id": "protoflower",
+      "name": "Protoflower",
+      "type": "Disposable",
+      "medium": "soil",
+      "renewable": false,
+      "variants": {
+        "common": {
+          "biopoints": 6,
+          "growthSec": 15
+        },
+        "uncommon": {
+          "biopoints": 27,
+          "growthSec": 60
+        },
+        "rare": {
+          "biopoints": 140,
+          "growthSec": 300
+        },
+        "epic": {
+          "biopoints": 870,
+          "growthSec": 1800
+        },
+        "legendary": {
+          "biopoints": 7200,
+          "growthSec": 14400
+        }
+      }
+    },
+    {
+      "id": "purple-carrot-seed",
+      "name": "Purple Carrot Seed",
+      "type": "Limited",
+      "medium": "soil",
+      "renewable": true,
+      "variants": {
+        "common": {
+          "biopoints": 95,
+          "growthSec": 10800
+        },
+        "uncommon": {
+          "biopoints": 156,
+          "growthSec": 9000
+        },
+        "rare": {
+          "biopoints": 280,
+          "growthSec": 8400
+        },
+        "epic": {
+          "biopoints": 940,
+          "growthSec": 7800
+        },
+        "legendary": {
+          "biopoints": 1733,
+          "growthSec": 7200
+        }
+      }
+    },
+    {
+      "id": "radish-seed",
+      "name": "Radish Seed",
+      "type": "Basic",
+      "medium": "soil",
+      "renewable": true,
+      "variants": {
+        "common": {
+          "biopoints": 2,
+          "growthSec": 480
+        },
+        "uncommon": {
+          "biopoints": 4,
+          "growthSec": 480
+        },
+        "rare": {
+          "biopoints": 6,
+          "growthSec": 480
+        },
+        "epic": {
+          "biopoints": 10,
+          "growthSec": 480
+        },
+        "legendary": {
+          "biopoints": 16,
+          "growthSec": 480
+        }
+      }
+    },
+    {
+      "id": "snowdrop-seed",
+      "name": "Snowdrop Seed",
+      "type": "Basic",
+      "medium": "soil",
+      "renewable": true,
+      "variants": {
+        "common": {
+          "biopoints": 70,
+          "growthSec": 9360
+        },
+        "uncommon": {
+          "biopoints": 141,
+          "growthSec": 9360
+        },
+        "rare": {
+          "biopoints": 276,
+          "growthSec": 9360
+        },
+        "epic": {
+          "biopoints": 560,
+          "growthSec": 9360
+        },
+        "legendary": {
+          "biopoints": 1116,
+          "growthSec": 9360
+        }
+      }
+    },
+    {
+      "id": "spectral-fern",
+      "name": "Spectral Fern",
+      "type": "Seasonal Seed",
+      "medium": "water",
+      "renewable": true,
+      "variants": {
+        "common": {
+          "biopoints": 5520,
+          "growthSec": 8280
+        }
+      }
+    },
+    {
+      "id": "spectral-trout-juvenile",
+      "name": "Spectral Trout Juvenile",
+      "type": "Seasonal Food Seed",
+      "medium": "water",
+      "renewable": true,
+      "variants": {
+        "common": {
+          "biopoints": 758,
+          "growthSec": 1728
+        }
+      }
+    },
+    {
+      "id": "spinach-seed",
+      "name": "Spinach Seed",
+      "type": "Basic",
+      "medium": "soil",
+      "renewable": true,
+      "variants": {
+        "common": {
+          "biopoints": 11,
+          "growthSec": 1380
+        },
+        "uncommon": {
+          "biopoints": 22,
+          "growthSec": 1380
+        },
+        "rare": {
+          "biopoints": 46,
+          "growthSec": 1380
+        },
+        "epic": {
+          "biopoints": 89,
+          "growthSec": 1380
+        },
+        "legendary": {
+          "biopoints": 179,
+          "growthSec": 1380
+        }
+      }
+    },
+    {
+      "id": "star-anise-seeds",
+      "name": "Star Anise Seeds",
+      "type": "Limited (2026)",
+      "medium": "soil",
+      "renewable": true,
+      "variants": {
+        "common": {
+          "biopoints": 2,
+          "growthSec": 720
+        },
+        "uncommon": {
+          "biopoints": 16,
+          "growthSec": 1700
+        },
+        "rare": {
+          "biopoints": 142,
+          "growthSec": 5000
+        },
+        "epic": {
+          "biopoints": 1289,
+          "growthSec": 15000
+        },
+        "legendary": {
+          "biopoints": 11625,
+          "growthSec": 45000
+        }
+      }
+    },
+    {
+      "id": "strawberry-seed",
+      "name": "Strawberry Seed",
+      "type": "Basic",
+      "medium": "soil",
+      "renewable": true,
+      "variants": {
+        "common": {
+          "biopoints": 1,
+          "growthSec": 120
+        },
+        "uncommon": {
+          "biopoints": 2,
+          "growthSec": 120
+        },
+        "rare": {
+          "biopoints": 3,
+          "growthSec": 120
+        },
+        "epic": {
+          "biopoints": 7,
+          "growthSec": 120
+        },
+        "legendary": {
+          "biopoints": 13,
+          "growthSec": 120
+        }
+      }
+    },
+    {
+      "id": "sugarcane-seed",
+      "name": "Sugarcane Seed",
+      "type": "Seasonal",
+      "medium": "water",
+      "renewable": true,
+      "variants": {
+        "common": {
+          "biopoints": 12800,
+          "growthSec": 28445
+        },
+        "uncommon": {
+          "biopoints": 15510,
+          "growthSec": 33840
+        },
+        "rare": {
+          "biopoints": 19152,
+          "growthSec": 41040
+        }
+      }
+    },
+    {
+      "id": "sunflower-seed",
+      "name": "Sunflower Seed",
+      "type": "Limited",
+      "medium": "soil",
+      "renewable": true,
+      "variants": {
+        "common": {
+          "biopoints": 32,
+          "growthSec": 3600
+        },
+        "uncommon": {
+          "biopoints": 70,
+          "growthSec": 3600
+        },
+        "rare": {
+          "biopoints": 166,
+          "growthSec": 3600
+        },
+        "epic": {
+          "biopoints": 376,
+          "growthSec": 3600
+        },
+        "legendary": {
+          "biopoints": 874,
+          "growthSec": 3600
+        }
+      }
+    },
+    {
+      "id": "sweet-potato-seed",
+      "name": "Sweet Potato Seed",
+      "type": "Basic",
+      "medium": "soil",
+      "renewable": true,
+      "variants": {
+        "common": {
+          "biopoints": 107,
+          "growthSec": 14640
+        },
+        "uncommon": {
+          "biopoints": 215,
+          "growthSec": 14640
+        },
+        "rare": {
+          "biopoints": 422,
+          "growthSec": 14640
+        },
+        "epic": {
+          "biopoints": 847,
+          "growthSec": 14640
+        },
+        "legendary": {
+          "biopoints": 1701,
+          "growthSec": 14640
+        }
+      }
+    },
+    {
+      "id": "tomato-seed",
+      "name": "Tomato Seed",
+      "type": "Disposable",
+      "medium": "soil",
+      "renewable": false,
+      "variants": {
+        "common": {
+          "biopoints": 57,
+          "growthSec": 20400
+        },
+        "uncommon": {
+          "biopoints": 200,
+          "growthSec": 20100
+        },
+        "rare": {
+          "biopoints": 1237,
+          "growthSec": 19800
+        },
+        "epic": {
+          "biopoints": 2616,
+          "growthSec": 19500
+        },
+        "legendary": {
+          "biopoints": 7072,
+          "growthSec": 19200
+        }
+      }
+    },
+    {
+      "id": "watermelon-seed",
+      "name": "Watermelon Seed",
+      "type": "Basic",
+      "medium": "soil",
+      "renewable": true,
+      "variants": {
+        "common": {
+          "biopoints": 51,
+          "growthSec": 6720
+        },
+        "uncommon": {
+          "biopoints": 100,
+          "growthSec": 6720
+        },
+        "rare": {
+          "biopoints": 196,
+          "growthSec": 6720
+        },
+        "epic": {
+          "biopoints": 412,
+          "growthSec": 6720
+        },
+        "legendary": {
+          "biopoints": 825,
+          "growthSec": 6720
+        }
+      }
+    },
+    {
+      "id": "white-lily-seed",
+      "name": "White Lily Seed",
+      "type": "Limited",
+      "medium": "soil",
+      "renewable": true,
+      "variants": {
+        "common": {
+          "biopoints": 190,
+          "growthSec": 18000
+        },
+        "uncommon": {
+          "biopoints": 400,
+          "growthSec": 18000
+        },
+        "rare": {
+          "biopoints": 970,
+          "growthSec": 18000
+        },
+        "epic": {
+          "biopoints": 2170,
+          "growthSec": 18000
+        },
+        "legendary": {
+          "biopoints": 4595,
+          "growthSec": 18000
+        }
+      }
+    }
+  ]
+}

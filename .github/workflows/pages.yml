@@ -1,0 +1,58 @@
+name: Deploy to GitHub Pages
+
+# Builds the static app and publishes dist/ to GitHub Pages on every push to main.
+#
+# One-time setup, in the repository settings:
+#   Settings → Pages → Build and deployment → Source: "GitHub Actions"
+#
+# Optional repository variables (Settings → Secrets and variables → Actions → Variables):
+#   VITE_SITE_URL        the app's public origin, once you have one
+#   VITE_EXTENSION_URL   the Chrome Web Store listing, once it is approved
+# Both default to empty, and the app falls back to something true when they are unset.
+# See docs/releasing.md.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      VITE_SITE_URL: ${{ vars.VITE_SITE_URL }}
+      VITE_EXTENSION_URL: ${{ vars.VITE_EXTENSION_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

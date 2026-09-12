@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>Privacy policy — Bioplot</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <style>
+      :root { color-scheme: dark; }
+      body {
+        margin: 0;
+        padding: 3rem 1.5rem 5rem;
+        background: #0d1613;
+        color: #dbe7e0;
+        font: 16px/1.65 system-ui, -apple-system, 'Segoe UI', sans-serif;
+      }
+      main { max-width: 42rem; margin: 0 auto; }
+      a { color: #86efac; }
+      h1 { font-size: 1.6rem; line-height: 1.25; margin: 0 0 1.5rem; }
+      h2 { font-size: 1.1rem; margin: 2.25rem 0 0.6rem; color: #f2fbf6; }
+      p, ul { margin: 0 0 1rem; }
+      ul { padding-left: 1.25rem; }
+      li { margin-bottom: 0.35rem; }
+      code {
+        background: #16241f;
+        border-radius: 4px;
+        padding: 0.1em 0.35em;
+        font-size: 0.9em;
+      }
+      strong { color: #f2fbf6; }
+      .back { display: inline-block; margin-bottom: 2rem; font-size: 0.9rem; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <a class="back" href="/">&larr; Bioplot</a>
+      <h1>Privacy policy — Bioplot</h1>
+      <p>Last updated: 2026-09-03</p>
+      <p><strong>Short version: nothing you do here reaches us, because there is no "us" to reach.</strong> The web app is a static page and the extension talks to no server of ours. There is no account, no backend, no analytics, and no telemetry.</p>
+      <h2>What the extension reads</h2>
+      <p>While you have chainers.io open, the extension observes the responses the game itself requests, and keeps the ones that describe your farm: your plots, your seeds, your animals, your inventory and the game's public catalogues.</p>
+      <p>It does this passively. It never issues a request of its own, never plants, harvests, buys, merges or signs anything, and never writes to your account.</p>
+      <h2>What it never touches</h2>
+      <ul><li>Session tokens, cookies, authorisation headers or passwords. These are not read, not stored and not forwarded. Only parsed inventory rows leave the extension, and only to a bioplot page open in the same browser.</li><li>Any site other than <code>chainers.io</code> and the Bioplot page itself.</li><li>Your wallet. Nothing is signed, and no transaction is ever created.</li></ul>
+      <h2>Where the data lives</h2>
+      <p>In your browser profile, in the extension's local storage, and in the web page's <code>localStorage</code>. It stays on your device. Both are wiped by <strong>Reset</strong> in the extension popup or <strong>Reset everything</strong> in the app.</p>
+      <p>Uninstalling the extension removes its copy. Clearing site data for the app removes the other.</p>
+      <h2>Third parties</h2>
+      <p>None. Seed artwork is loaded directly from the game's own CDN (<code>static.chainers.io</code>) using the URLs the game publishes, which means that CDN sees an ordinary image request from your browser. No other external request is made.</p>
+      <h2>Changes</h2>
+      <p>This page carries the date it was last changed, at the top. A change that affects what is read or where it goes will move that date; check it if you want to know whether anything has.</p>
+      <h2>Verifying this yourself</h2>
+      <p>You do not have to take this on trust. A browser extension is installed as ordinary, unminified JavaScript: open <code>chrome://extensions</code>, turn on Developer mode, and use <strong>Inspect views</strong> or <strong>service worker</strong> to read every line of it. The network tab of your own browser will show you the same thing from the outside: while Bioplot is open, it makes no request to any server we control, because there is none.</p>
+      <h2>Contact</h2>
+      <p><a href="https://github.com/develoverli/bioplot/issues">Open an issue</a> on GitHub. The source of both the app and the extension is published there under the MIT licence.</p>
+    </main>
+  </body>
+</html>

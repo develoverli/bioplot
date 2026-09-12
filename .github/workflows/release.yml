@@ -1,0 +1,75 @@
+name: Release
+
+# Pushing a tag like v0.1.0 packages the extension and publishes a GitHub Release with the
+# zip and its checksum attached. The tag is the source of truth: it must equal the version in
+# extension/manifest.json and package.json, or the run fails before anything is published.
+#
+# See docs/releasing.md for the full procedure.
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  extension:
+    name: package extension · publish release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tag matches manifest and package versions
+        id: version
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          MANIFEST=$(python -c "import json; print(json.load(open('extension/manifest.json'))['version'])")
+          PKG=$(python -c "import json; print(json.load(open('package.json'))['version'])")
+          echo "tag: $TAG · extension/manifest.json: $MANIFEST · package.json: $PKG"
+          if [ "$TAG" != "$MANIFEST" ]; then
+            echo "::error::tag v$TAG does not match extension/manifest.json version $MANIFEST"
+            exit 1
+          fi
+          if [ "$TAG" != "$PKG" ]; then
+            echo "::error::tag v$TAG does not match package.json version $PKG"
+            exit 1
+          fi
+          echo "version=$TAG" >> "$GITHUB_OUTPUT"
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # Never publish a build whose tests do not pass.
+      - run: pnpm test
+
+      - name: Package the extension
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          mkdir -p out
+          ZIP="out/bioplot-farm-reader-v${VERSION}.zip"
+          # Only what the browser loads: manifest, popup, scripts, icons. Tests stay out.
+          (cd extension && zip -r "../$ZIP" . -x 'parse.test.js' -x '*.map' -x '.DS_Store')
+          (cd out && sha256sum *.zip > SHA256SUMS.txt)
+          unzip -l "$ZIP"
+          cat out/SHA256SUMS.txt
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: v${{ steps.version.outputs.version }}
+          files: |
+            out/*.zip
+            out/SHA256SUMS.txt
+          generate_release_notes: true
+          body: |
+            **Bioplot Farm Reader v${{ steps.version.outputs.version }}** — Chrome extension (Manifest V3, read-only).
+
+            Install from the zip: download it, unzip, then `chrome://extensions` → Developer mode → **Load unpacked** → pick the unzipped folder. Verify the download against `SHA256SUMS.txt`.
+
+            The extension only talks to a Bioplot page open in the same browser. See [PRIVACY.md](https://github.com/${{ github.repository }}/blob/main/PRIVACY.md).

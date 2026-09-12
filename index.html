@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <title>Bioplot — biopoint planner for Chainers Farm</title>
+    <meta
+      name="description"
+      content="Plan your Chainers Farm: read your seeds, plots and animals, then see exactly what to plant for the most biopoints in 24 hours."
+    />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script>
+      /*
+        The theme, before the first paint.
+        React sets `data-theme` in an effect, which is one frame too late: the page would flash
+        light and then turn dark on every load. Reading the stored choice here costs nothing and
+        removes the flash. Dark is the default because the farm map, the rarity colours and the
+        biolume greens were all drawn for a dark ground.
+      */
+      try {
+        var saved = localStorage.getItem('bioplot:state') || localStorage.getItem('chain-proplayer:state')
+        var theme = saved ? JSON.parse(saved).theme : 'dark'
+        if (theme === 'system') document.documentElement.removeAttribute('data-theme')
+        else document.documentElement.setAttribute('data-theme', theme === 'light' ? 'light' : 'dark')
+      } catch (error) {
+        /* A private window or blocked site data just gets the default. */
+      }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

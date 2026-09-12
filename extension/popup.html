@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Bioplot</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0f1614;
+        --surface: #18231f;
+        --line: #27362f;
+        --text: #e9f2ee;
+        --muted: #9ab0a8;
+        --faint: #6d827b;
+        --ok: #4ade80;
+        --warn: #fbbf24;
+        --bad: #f87171;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        width: 21rem;
+        padding: 16px;
+        background: var(--bg);
+        color: var(--text);
+        font: 13px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      /* The mark is drawn, not scaled down from a 128px bitmap, so it stays crisp at 34px. */
+      header svg.mark {
+        width: 34px;
+        height: 34px;
+        flex: none;
+        border-radius: 9px;
+      }
+      .title {
+        flex: 1;
+        min-width: 0;
+      }
+      h1 {
+        margin: 0;
+        font-size: 14px;
+        letter-spacing: -0.01em;
+      }
+      .sub {
+        margin: 0;
+        color: var(--faint);
+        font-size: 11px;
+      }
+
+      /* One line that says whether this is working, in one colour. */
+      #state {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 12px;
+        padding: 10px 12px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--surface);
+        font-weight: 600;
+      }
+      #dot {
+        width: 10px;
+        height: 10px;
+        flex: 0 0 auto;
+        border-radius: 50%;
+        background: var(--faint);
+      }
+      #state.ok,
+      #state.warn,
+      #state.bad {
+        color: inherit;
+      }
+      #state.ok #dot {
+        background: var(--ok);
+      }
+      #state.ok #stateText {
+        color: var(--ok);
+      }
+      #state.warn #dot {
+        background: var(--warn);
+      }
+      #state.warn #stateText {
+        color: var(--warn);
+      }
+      #state.bad #dot {
+        background: var(--bad);
+      }
+      #state.bad #stateText {
+        color: var(--bad);
+      }
+
+      .counts {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 8px;
+        margin-top: 8px;
+      }
+      .count {
+        margin: 0;
+        padding: 10px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--surface);
+        text-align: center;
+      }
+      .count b {
+        display: block;
+        font-size: 20px;
+        font-variant-numeric: tabular-nums;
+        line-height: 1.15;
+      }
+      .count span {
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .hint {
+        margin: 10px 0 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .row {
+        display: flex;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      button {
+        flex: 1;
+        min-height: 34px;
+        padding: 0 10px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: var(--surface);
+        color: var(--text);
+        font: inherit;
+        font-weight: 500;
+        cursor: pointer;
+      }
+      button:hover:not(:disabled) {
+        border-color: var(--ok);
+      }
+      button:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      button.primary {
+        border-color: transparent;
+        background: var(--ok);
+        color: #06140c;
+        font-weight: 600;
+      }
+      button.primary:hover:not(:disabled) {
+        background: #86efac;
+      }
+      button.danger {
+        color: var(--bad);
+      }
+
+      details.tools {
+        margin-top: 12px;
+        border-top: 1px solid var(--line);
+        padding-top: 10px;
+      }
+      details.tools summary {
+        color: var(--faint);
+        cursor: pointer;
+        font-size: 12px;
+        list-style: none;
+      }
+      details.tools summary::-webkit-details-marker {
+        display: none;
+      }
+      details.tools summary:hover {
+        color: var(--muted);
+      }
+      details.tools summary::before {
+        content: '▸ ';
+      }
+      details.tools[open] summary::before {
+        content: '▾ ';
+      }
+
+      .links {
+        margin: 12px 0 0;
+        display: flex;
+        gap: 10px;
+        font-size: 11px;
+      }
+      .links a {
+        color: var(--muted);
+      }
+      button.danger:hover:not(:disabled) {
+        border-color: var(--bad);
+      }
+      button:focus-visible {
+        outline: 2px solid var(--ok);
+        outline-offset: 2px;
+      }
+
+      #status {
+        margin: 10px 0 0;
+        min-height: 1.2em;
+        color: var(--ok);
+        font-size: 12px;
+      }
+      .note {
+        margin: 10px 0 0;
+        color: var(--faint);
+        font-size: 11px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <svg class="mark" viewBox="0 0 64 64" role="img" aria-label="Bioplot">
+        <rect width="64" height="64" rx="15" fill="#1e8a4e" />
+        <rect x="12.5" y="37.1" width="9.6" height="14.1" rx="2" fill="#86efac" />
+        <rect x="25.6" y="28.2" width="9.6" height="23" rx="2" fill="#bef6d6" />
+        <rect x="38.7" y="19.2" width="9.6" height="32" rx="2" fill="#f5fdf9" />
+        <g fill="none" stroke="#10542f" stroke-width="1.9">
+          <circle cx="43.5" cy="29" r="2.7" />
+          <circle cx="43.5" cy="38.5" r="2.7" />
+        </g>
+        <rect x="10.9" y="51.2" width="41" height="3.2" rx="1.6" fill="#10542f" />
+        <rect x="42.5" y="12" width="2.1" height="8.5" rx="1" fill="#6ee29c" />
+        <ellipse cx="49" cy="13.4" rx="6.5" ry="3.5" fill="#86efac" transform="rotate(-32 49 13.4)" />
+        <ellipse cx="38" cy="13.4" rx="6.5" ry="3.5" fill="#5fd68d" transform="rotate(32 38 13.4)" />
+      </svg>
+      <span class="title">
+        <h1>Bioplot</h1>
+        <p class="sub">Read-only farm reader</p>
+      </span>
+      <p class="sub" id="last">—</p>
+    </header>
+
+    <p id="state"><span id="dot"></span><span id="stateText" role="status">Checking…</span></p>
+
+    <div class="counts">
+      <p class="count"><b id="seeds">—</b><span>seeds</span></p>
+      <p class="count"><b id="plots">—</b><span>plots</span></p>
+      <p class="count"><b id="animals">—</b><span>animals</span></p>
+    </div>
+
+    <p class="hint" id="hint"></p>
+
+    <div class="row">
+      <button id="copy" class="primary">Copy for the app</button>
+      <button id="clear" class="danger">Reset</button>
+    </div>
+
+    <details class="tools">
+      <summary>Report a problem</summary>
+      <p class="note">
+        These two produce a bug report for the developers. Diagnostics describes the shape of
+        what was captured; raw is the full payload and can be large.
+      </p>
+      <div class="row">
+        <button id="copyDiag">Copy diagnostics</button>
+        <button id="copyRaw">Copy raw</button>
+      </div>
+    </details>
+
+    <p id="status" role="status"></p>
+
+    <p class="note">
+      Normally you do not need Copy: open Bioplot and press <b>Sync now</b>. Copy is for
+      when the app runs in another browser — paste it there under &ldquo;Paste a capture&rdquo;.
+    </p>
+    <p class="note">
+      Nothing is sent anywhere. No token, cookie or password is ever read. Everything lives in
+      this browser profile, and Reset wipes it.
+    </p>
+    <!--
+      The policy pages are served by the app itself, so their address is the app's address.
+      popup.js fills these in and hides the row entirely while SITE_URL is unset, because a
+      dead "Privacy" link is worse than no link at all.
+    -->
+    <p class="links" id="links" hidden>
+      <a id="privacyLink" href="#" target="_blank" rel="noreferrer">Privacy</a>
+      <a id="termsLink" href="#" target="_blank" rel="noreferrer">Terms</a>
+    </p>
+
+    <script src="src/seed-names.js"></script>
+    <script src="src/parse.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>

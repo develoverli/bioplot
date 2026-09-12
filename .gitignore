@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+extension/dist/
+*.tsbuildinfo
+.vite/
+coverage/
+
+# Local environment (only .env.example is committed)
+.env
+.env.*
+!.env.example
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.local
+*.log
+
+# Tooling scratch
+.claude/settings.local.json
+graphify-out/
+reports/

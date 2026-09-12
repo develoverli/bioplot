@@ -1,0 +1,237 @@
+{
+  "source": "https://docs.chainers.io/chainers-docs/chainers/chainers-farm/animals",
+  "extractedAt": "2026-09-02",
+  "note": "Animal PRODUCTS. Animals need food crafted in the Workshop, so their output is not a plain replant loop and the v1 optimizer does not schedule them.",
+  "groups": [
+    {
+      "group": "Fire Feather Animals",
+      "products": [
+        {
+          "name": "Common Firebird Feather",
+          "biopoints": 30000,
+          "growthSec": 21132
+        }
+      ]
+    },
+    {
+      "group": "Veilstone Animals",
+      "products": [
+        {
+          "name": "Common Veilstone",
+          "biopoints": 24540,
+          "growthSec": 13680
+        }
+      ]
+    },
+    {
+      "group": "Honey Animals",
+      "products": [
+        {
+          "name": "Common Honey",
+          "biopoints": 3801,
+          "growthSec": 8964
+        },
+        {
+          "name": "Uncommon Honey",
+          "biopoints": 14529,
+          "growthSec": 12564
+        }
+      ]
+    },
+    {
+      "group": "Shells Animals",
+      "products": [
+        {
+          "name": "Common Shell",
+          "biopoints": 31313,
+          "growthSec": 36475
+        }
+      ]
+    },
+    {
+      "group": "Feather Animals",
+      "products": [
+        {
+          "name": "Common Feather",
+          "biopoints": 5812,
+          "growthSec": 15120
+        },
+        {
+          "name": "Common Egg",
+          "biopoints": 8655,
+          "growthSec": 21960
+        },
+        {
+          "name": "Uncommon Egg",
+          "biopoints": 9032,
+          "growthSec": 22680
+        },
+        {
+          "name": "Rare Egg",
+          "biopoints": 11858,
+          "growthSec": 28800
+        },
+        {
+          "name": "Epic Egg",
+          "biopoints": 15119,
+          "growthSec": 35280
+        },
+        {
+          "name": "Legendary Egg",
+          "biopoints": 18900,
+          "growthSec": 38160
+        }
+      ]
+    },
+    {
+      "group": "Truffle Animals",
+      "products": [
+        {
+          "name": "Common Truffle",
+          "biopoints": 4100,
+          "growthSec": 14400
+        },
+        {
+          "name": "Uncommon Truffle",
+          "biopoints": 4755,
+          "growthSec": 16200
+        },
+        {
+          "name": "Rare Truffle",
+          "biopoints": 5500,
+          "growthSec": 18000
+        },
+        {
+          "name": "Epic Truffle",
+          "biopoints": 8670,
+          "growthSec": 23400
+        },
+        {
+          "name": "Legendary Truffle",
+          "biopoints": 10050,
+          "growthSec": 25200
+        }
+      ]
+    },
+    {
+      "group": "Gingerbread Animals",
+      "products": [
+        {
+          "name": "Common Gingerbread",
+          "biopoints": 4833,
+          "growthSec": 18000
+        },
+        {
+          "name": "Uncommon Gingerbread",
+          "biopoints": 5973,
+          "growthSec": 21600
+        },
+        {
+          "name": "Rare Gingerbread",
+          "biopoints": 7380,
+          "growthSec": 25200
+        },
+        {
+          "name": "Epic Gingerbread",
+          "biopoints": 9501,
+          "growthSec": 28800
+        },
+        {
+          "name": "Legendary Gingerbread",
+          "biopoints": 11058,
+          "growthSec": 32400
+        }
+      ]
+    },
+    {
+      "group": "Wool Animals",
+      "products": [
+        {
+          "name": "Common wool",
+          "biopoints": 469,
+          "growthSec": 13800
+        },
+        {
+          "name": "Uncommon wool",
+          "biopoints": 863,
+          "growthSec": 13800
+        },
+        {
+          "name": "Rare wool",
+          "biopoints": 1334,
+          "growthSec": 13800
+        },
+        {
+          "name": "Epic wool",
+          "biopoints": 2194,
+          "growthSec": 13800
+        },
+        {
+          "name": "Legendary wool",
+          "biopoints": 3526,
+          "growthSec": 13800
+        }
+      ]
+    },
+    {
+      "group": "Egg Animals",
+      "products": [
+        {
+          "name": "Common egg",
+          "biopoints": 18,
+          "growthSec": 1800
+        },
+        {
+          "name": "Uncommon egg",
+          "biopoints": 63,
+          "growthSec": 1800
+        },
+        {
+          "name": "Rare egg",
+          "biopoints": 91,
+          "growthSec": 1800
+        },
+        {
+          "name": "Epic egg",
+          "biopoints": 123,
+          "growthSec": 1800
+        },
+        {
+          "name": "Legendary egg",
+          "biopoints": 224,
+          "growthSec": 1800
+        }
+      ]
+    },
+    {
+      "group": "Milk Animals",
+      "products": [
+        {
+          "name": "Common milk",
+          "biopoints": 272,
+          "growthSec": 6600
+        },
+        {
+          "name": "Uncommon milk",
+          "biopoints": 466,
+          "growthSec": 6600
+        },
+        {
+          "name": "Rare milk",
+          "biopoints": 661,
+          "growthSec": 6600
+        },
+        {
+          "name": "Epic milk",
+          "biopoints": 855,
+          "growthSec": 6600
+        },
+        {
+          "name": "Legendary milk",
+          "biopoints": 1516,
+          "growthSec": 6600
+        }
+      ]
+    }
+  ]
+}

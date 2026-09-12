@@ -1,0 +1,42 @@
+{
+  "source": "https://docs.chainers.io/chainers-docs/chainers/chainers-farm",
+  "extractedAt": "2026-09-02",
+  "rarities": ["common", "uncommon", "rare", "epic", "legendary"],
+  "plots": [
+    { "rarity": "common",    "criticalChance": 0,      "normalDrop": 1,  "criticalDrop": 1  },
+    { "rarity": "uncommon",  "criticalChance": 0.0005, "normalDrop": 2,  "criticalDrop": 4  },
+    { "rarity": "rare",      "criticalChance": 0.015,  "normalDrop": 4,  "criticalDrop": 8  },
+    { "rarity": "epic",      "criticalChance": 0.04,   "normalDrop": 8,  "criticalDrop": 15 },
+    { "rarity": "legendary", "criticalChance": 0.10,   "normalDrop": 16, "criticalDrop": 32 }
+  ],
+  "lamps": [
+    { "rarity": "common",   "growthTimeReduction": 0.03, "rarityUpgradeChance": 0.03, "criticalMultiplier": 2.05 },
+    { "rarity": "uncommon", "growthTimeReduction": 0.07, "rarityUpgradeChance": 0.07, "criticalMultiplier": 2.15 },
+    { "rarity": "rare",     "growthTimeReduction": 0.15, "rarityUpgradeChance": 0.15, "criticalMultiplier": 2.35 }
+  ],
+  "lands": [
+    { "id": "sunny-field",    "name": "Sunny Field",    "medium": "soil",  "productionMultiplier": 1, "size": null },
+    { "id": "meadow-grove",   "name": "Meadow Grove",   "medium": "soil",  "productionMultiplier": 1, "size": "13x21" },
+    { "id": "golden-acres",   "name": "Golden Acres",   "medium": "soil",  "productionMultiplier": 2, "size": "30x21" },
+    { "id": "tranquil-waters","name": "Tranquil Waters","medium": "water", "productionMultiplier": 1, "size": null }
+  ],
+  "fertilizers": [
+    { "rarity": "legendary", "growthTimeReduction": 0.5, "note": "Applies to the REMAINING growth time at the moment of use." }
+  ],
+  "rewardPool": {
+    "cycleHours": 4,
+    "cyclesPerDay": 6,
+    "currencies": ["BNB", "CFB", "POL"],
+    "tiers": 4,
+    "withdrawalLimits": { "BNB": 0.016, "POL": 50 }
+  },
+  "notes": [
+    "Crop rarity always matches the seed rarity, or exceeds it when grown under a phytolamp.",
+    "Plot (bed) rarity dictates the harvested QUANTITY, not the rarity.",
+    "Lamp bonuses are not cumulative: one lamp per plant, stacking does nothing.",
+    "The lamp bonus only applies if the plant was BOTH planted and grown under the lamp.",
+    "A phytolamp REPLACES the plot's critical harvest multiplier with its own.",
+    "Golden Acres grants +100% to total production.",
+    "Seeds and plots cannot be contributed to the Reward Pool - only harvest items."
+  ]
+}
