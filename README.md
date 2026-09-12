@@ -4,6 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-2ea043.svg)](LICENSE)
 [![Read-only extension](https://img.shields.io/badge/extension-read--only-86efac.svg)](PRIVACY.md)
 [![No backend](https://img.shields.io/badge/backend-none-6b7280.svg)](PRIVACY.md)
+[![Chrome Web Store](https://img.shields.io/badge/chrome%20web%20store-awaiting%20review-f59e0b.svg)](#the-extension)
 
 Biopoint planner for [Chainers Farm](https://chainers.io/). It reads your plots, seeds and
 animals out of your own browser, and tells you exactly what to plant to bank the most
@@ -73,6 +74,10 @@ anyway, and to CoinGecko for BNB and POL prices; neither carries any account dat
 the responses the game already made, and never issues a game request, never writes, never
 signs. It never reads a token, a cookie or a password. See [PRIVACY.md](PRIVACY.md).
 
+It is in review for the Chrome Web Store. Until Google approves it, the way in is the release
+zip or the unpacked folder, which is the same code either way: the store listing will serve
+exactly what a tag built.
+
 Loading the farm page is the whole capture: plots, seeds, animals, crafting recipes and the
 reward pools arrive together. The popup says what it holds and what to do next, in one line.
 
@@ -94,12 +99,17 @@ pnpm dev          # the app on http://localhost:5173
 ```
 
 Load the extension: `chrome://extensions` → Developer mode → **Load unpacked** → pick the
-`extension/` folder. Then open chainers.io, let the farm load once, and press **Sync now** in
-the app.
+`extension/` folder. Then open chainers.io, reload the farm page, and press **Sync now** in the
+app. Loading the farm is the whole capture.
 
 Not building it yourself? Every tagged version ships a ready-to-load zip on the
 [Releases](https://github.com/develoverli/bioplot/releases) page, with a `SHA256SUMS.txt`
 next to it. Unzip it and **Load unpacked** the folder the same way.
+
+**Installing by hand is temporary.** The extension has been submitted to the Chrome Web Store
+and is waiting on Google's review, which takes days rather than minutes. Once it is approved,
+installing it is one click from the store and this section becomes a footnote: the app itself
+links to the listing as soon as it exists, and shows these steps only while it does not.
 
 Other scripts:
 
@@ -155,6 +165,11 @@ Bug reports and pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.m
 rules above are the review checklist. Security concerns go through [SECURITY.md](SECURITY.md).
 
 Everyone taking part is expected to follow the [code of conduct](CODE_OF_CONDUCT.md).
+
+Once the Chrome Web Store listing is live, two things change and nothing else: the
+`VITE_EXTENSION_URL` repository variable gets the listing URL, so the app links to it instead
+of explaining how to load an unpacked folder, and the badge above stops saying "awaiting
+review". The steps are in [docs/releasing.md](docs/releasing.md).
 
 ## Releases and deployment
 
