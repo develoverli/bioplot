@@ -21,6 +21,27 @@ const CELL = 32
  */
 const MARGIN = 1.25
 
+/**
+ * How much of the viewport the field may take, and the shape it keeps.
+ *
+ * The field is sized by its own proportions: the column gives the width, the ratio gives the
+ * height. The budget caps a tall land so it never pushes the totals off a desktop screen, and
+ * the card around the field applies the same budget to its width, so the map is as large as
+ * the screen allows with no dead space beside it.
+ */
+export const FIELD_HEIGHT = '74vh'
+
+export function fieldAspectRatio(garden: Garden): number {
+  const width = garden.width + MARGIN * 2
+  const height = garden.height + MARGIN * 2
+  return height > 0 ? width / height : 1
+}
+
+/** The widest the field's card should be, for this land and this budget. */
+export function fieldMaxWidth(garden: Garden): string {
+  return `calc(${FIELD_HEIGHT} * ${fieldAspectRatio(garden).toFixed(3)})`
+}
+
 function boundsOf(bed: GardenBed) {
   let minX = Infinity
   let minY = Infinity
@@ -131,11 +152,7 @@ export function FarmField({
         and the matching max width keeps the box on the ratio when that cap is what binds.
       */
       className="mx-auto block h-auto w-full"
-      style={{
-        aspectRatio: `${width} / ${height}`,
-        maxHeight: '72vh',
-        maxWidth: `calc(72vh * ${(width / height).toFixed(3)})`,
-      }}
+      style={{ aspectRatio: `${width} / ${height}`, maxHeight: FIELD_HEIGHT }}
     >
       <defs>
         {/* Feed you do not have is shown, but drained of colour: present, not available. */}

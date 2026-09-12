@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useId, useRef, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react'
 import { Check, ChevronRight, X } from 'lucide-react'
 import type { Rarity } from '../lib/types'
 import { titleCase } from '../lib/format'
@@ -353,13 +353,22 @@ export function TabPanel({
   id,
   children,
   className = '',
+  style,
 }: {
   id: string
   children: ReactNode
   className?: string
+  /** For a panel whose width follows its content's own proportions, like the farm field. */
+  style?: CSSProperties
 }) {
   return (
-    <div role="tabpanel" id={`panel-${id}`} aria-labelledby={`tab-${id}`} className={className}>
+    <div
+      role="tabpanel"
+      id={`panel-${id}`}
+      aria-labelledby={`tab-${id}`}
+      className={className}
+      style={style}
+    >
       {children}
     </div>
   )

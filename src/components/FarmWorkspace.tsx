@@ -9,7 +9,7 @@ import { applyLampPlan, inventoryWith, planLamps } from '../lib/layout'
 import { optimize, type Plan, type PlanEntry, type PlotPlan } from '../lib/optimizer'
 import type { Garden, Rarity, Seed } from '../lib/types'
 import { useStore } from '../store'
-import { FarmField } from './FarmField'
+import { FarmField, fieldMaxWidth } from './FarmField'
 import { FeedAdvice } from './FeedAdvice'
 import { RarityBadge, TabPanel } from './ui'
 import { FarmSummary, PickPlotPlaceholder, WorkspaceShell } from './WorkspaceShell'
@@ -732,7 +732,13 @@ export function FarmWorkspace({
       {toolbar}
 
       {center ?? (
-        <TabPanel id="farm" className="mx-auto flex w-fit max-w-full min-w-0 flex-col gap-2.5">
+        <TabPanel
+          id="farm"
+          className="mx-auto flex w-full min-w-0 flex-col gap-2.5"
+          // The field drives the width: as wide as its height budget allows, and no wider, so
+          // the card hugs the map instead of framing empty ground beside it.
+          style={{ maxWidth: fieldMaxWidth(garden) }}
+        >
           <div className="flex flex-wrap items-center justify-between gap-2">
             <LandTabs
               gardens={gardens}
