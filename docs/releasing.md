@@ -12,6 +12,7 @@ on.
 | `ci.yml` | every push to `main`, every pull request | `pnpm test`, `pnpm typecheck`, `pnpm build`, and checks that `extension/manifest.json` and `package.json` agree on the version |
 | `pages.yml` | every push to `main` | builds the app and deploys `dist/` to GitHub Pages |
 | `release.yml` | a tag `v*` | runs the tests, zips the extension, publishes a GitHub Release with the zip and a `SHA256SUMS.txt` |
+| `pools-history.yml` | hourly, and by hand | appends newly settled reward-pool blocks to `public/pools-history.json` from the public explorer and commits them (see [market-rate.md](market-rate.md)) |
 
 ## One-time repository setup
 

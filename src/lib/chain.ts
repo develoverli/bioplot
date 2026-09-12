@@ -543,3 +543,97 @@ export function assessPools(
     return a.position - b.position || b.earn - a.earn
   })
 }
+
+/**
+ * The shared history: public/pools-history.json, appended by scripts/pools-history.mjs on a
+ * schedule and served next to the app. Units per crop token, no weights: the app applies the
+ * player's catalogue, which knows event crops the docs do not.
+ */
+export const SNAPSHOT_URL = 'pools-history.json'
+
+export interface SnapshotVault {
+  vault: string
+  /** Raw currency units, as a string (the amount can exceed 2^53 in the smallest unit). */
+  payout: string
+  paid: string
+  contributions: number
+  contributors: number
+  payees: number
+  /** Units received per crop token name: "Common Strawberry": 297. */
+  units: Record<string, number>
+}
+
+export interface SnapshotBlock {
+  closeAt: string
+  openAt: string
+  pools: Record<string, SnapshotVault[]>
+}
+
+export interface Snapshot {
+  version: number
+  updatedAt: string | null
+  blockTimeSeconds: number
+  anchorCloseAt: string
+  blocks: SnapshotBlock[]
+}
+
+export function isSnapshot(value: unknown): value is Snapshot {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    Array.isArray((value as { blocks?: unknown }).blocks) &&
+    typeof (value as { blockTimeSeconds?: unknown }).blockTimeSeconds === 'number'
+  )
+}
+
+/** A vault's crop units weighed with the best catalogue available right now. */
+export function weighUnits(
+  units: Record<string, number>,
+  weightOf: WeightLookup,
+): { totalWeight: number; unknown: string[] } {
+  let totalWeight = 0
+  const unknown: string[] = []
+  for (const [name, count] of Object.entries(units)) {
+    const weight = weightOf(name)
+    if (weight === null) unknown.push(name)
+    else totalWeight += weight * count
+  }
+  return { totalWeight, unknown: unknown.sort() }
+}
+
+/**
+ * The snapshot's blocks for one tier of one currency, as the app's own blocks.
+ *
+ * The tier is the vault whose payout equals the live block's, the same rule the chain reader
+ * uses. Weights are applied here, at read time, so a newer catalogue improves old blocks.
+ */
+export function blocksFromSnapshot(
+  snapshot: Snapshot,
+  currency: string,
+  payoutRaw: number,
+  weightOf: WeightLookup,
+): MarketBlock[] {
+  const wanted = String(Math.round(payoutRaw))
+  const key = currencyKey(currency)
+  const out: MarketBlock[] = []
+  for (const block of snapshot.blocks) {
+    const vaults = key ? block.pools[key] : undefined
+    const vault = vaults?.find((candidate) => candidate.payout === wanted)
+    if (!vault) continue
+    const weighed = weighUnits(vault.units, weightOf)
+    out.push({
+      key: blockKey(currency, block.closeAt),
+      currency,
+      vault: vault.vault,
+      openAt: block.openAt,
+      closeAt: block.closeAt,
+      payout: Number(vault.payout),
+      totalWeight: weighed.totalWeight,
+      contributions: vault.contributions,
+      contributors: vault.contributors,
+      payees: vault.payees,
+      unknown: weighed.unknown,
+    })
+  }
+  return out
+}

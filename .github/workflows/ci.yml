@@ -3,6 +3,9 @@ name: CI
 on:
   push:
     branches: [main]
+    # The pools-history bot commits data six times a day; nothing to test there.
+    paths-ignore:
+      - 'public/pools-history.json'
   pull_request:
 
 permissions:

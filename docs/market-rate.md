@@ -85,6 +85,43 @@ A player can send their harvest to any of their tier's three pools, so the quest
 
 A pool with fewer than six settled blocks (a day) is listed but never recommended.
 
+## The shared history
+
+Reading a block from the chain costs about twenty seconds, and every visitor would repeat it.
+So the repository keeps one copy for everyone:
+
+- `scripts/pools-history.mjs` reads the newest settled block, **all four tiers of all three
+  currencies**, and appends it to `public/pools-history.json`. Node, stdlib only. It finds the
+  vaults by their **payout burst**: in the five minutes after a close, an address that sends
+  five or more transfers of a reward currency can only be a vault (the game mints CFB to
+  players all day, so the funding second is a poor place to look). The funding amount is then
+  read off the vault itself. One block is twelve vaults and about 80 seconds.
+- `.github/workflows/pools-history.yml` runs it every hour and commits the file when a block
+  settled (six commits a day, by `bioplot-bot`). Pages redeploys on the push.
+- The file stores **units per crop token** per vault, never weights. The app weighs them with
+  the player's captured catalogue when it loads the file, so event crops the docs do not know
+  are weighed correctly by anyone who has synced, and old blocks improve with a newer catalogue.
+- Tiers are told apart by payout amount (850 CFB, 3 675 CFB, …), because the game does not
+  publish tier names on chain. Observed on 2026-09-12: CFB 3675 / 3289 / 2080 / 850, BNB
+  0.0735 / 0.06435 / 0.032 / 0.002805, POL 441 / 343.2 / 208 / 17.
+- One block is about 50 KB of JSON (crop units for twelve vaults), roughly 300 KB a day. The
+  file is served compressed; if it grows past what a first load should carry, the script is
+  the place to roll older months into separate files. The app finds the player's tier as the vault whose payout
+  equals the live block's, the same rule as the direct chain read.
+
+The app fetches `pools-history.json` from its own origin first, then reads from the chain only
+the closes newer than the snapshot. Without the file (local dev, a fork that has not enabled
+the workflow) it reads the chain directly, as before.
+
+To seed a fresh fork, run the workflow by hand with a `backfill` of a few blocks, or locally:
+
+```sh
+node scripts/pools-history.mjs --backfill 6
+```
+
+GitHub disables scheduled workflows on repositories with no activity for sixty days; the bot's
+own commits keep it alive, but a fork should check the Actions tab once after enabling it.
+
 ## Window, cost, refresh
 
 - The app keeps the last **50 settled blocks per currency** for your tier (about eight days).

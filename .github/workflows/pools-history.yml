@@ -1,0 +1,59 @@
+name: Pools history
+
+# Appends the newest settled reward-pool blocks to public/pools-history.json, read straight
+# off the chain's public explorer, and commits the file when something new settled. Pages
+# redeploys on the push, so the app serves months of history instantly and only asks the
+# chain for what is newer. No account, no token, no server. See docs/market-rate.md.
+#
+# Blocks close every four hours at :49 UTC; running hourly at :57 catches each close a few
+# minutes after its payouts land and costs a no-op the other hours.
+
+on:
+  schedule:
+    - cron: '57 * * * *'
+  workflow_dispatch:
+    inputs:
+      backfill:
+        description: 'Blocks before the newest to read on a fresh snapshot'
+        required: false
+        default: '0'
+      max:
+        description: 'Blocks to read in this run'
+        required: false
+        default: '6'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pools-history
+  cancel-in-progress: false
+
+jobs:
+  append:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Read new blocks from the explorer
+        run: >
+          node scripts/pools-history.mjs
+          --backfill ${{ github.event.inputs.backfill || '0' }}
+          --max ${{ github.event.inputs.max || '6' }}
+
+      - name: Commit when the snapshot changed
+        run: |
+          if git diff --quiet -- public/pools-history.json; then
+            echo "snapshot unchanged"
+            exit 0
+          fi
+          NEWEST=$(node -e "console.log(JSON.parse(require('fs').readFileSync('public/pools-history.json','utf8')).blocks[0].closeAt)")
+          git config user.name "bioplot-bot"
+          git config user.email "bioplot-bot@users.noreply.github.com"
+          git add public/pools-history.json
+          git commit -m "🤖 data(pools): blocks up to ${NEWEST}"
+          git push

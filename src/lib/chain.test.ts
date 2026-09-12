@@ -3,6 +3,7 @@ import {
   CURRENCY_TOKENS,
   assessPools,
   blockCurrency,
+  blocksFromSnapshot,
   buildMarketHistory,
   buildWeightLookup,
   buildWeightLookups,
@@ -14,6 +15,7 @@ import {
   settledCloses,
   splitTokenName,
   type MarketBlock,
+  type Snapshot,
   type TokenTx,
 } from './chain'
 import { emptyCatalogue, emptyPools, type PoolBlock } from './types'
@@ -320,5 +322,36 @@ describe('assessPools', () => {
     const pools = { ...emptyPools, blocks: [liveBlock('CFB', 10, 850), liveBlock('BNB', 10, 32)] }
     const histories = { CFB: windowOf('CFB', [100]), BNB: windowOf('BNB', [100, 100, 100, 100, 100, 100]) }
     expect(assessPools(pools, histories, 1).map((entry) => entry.currency)).toEqual(['BNB', 'CFB'])
+  })
+})
+
+describe('blocksFromSnapshot', () => {
+  it('picks the tier by payout and weighs the units with the catalogue given', () => {
+    const snapshot: Snapshot = {
+      version: 1,
+      updatedAt: '2026-09-12T13:00:00.000Z',
+      blockTimeSeconds: 14_400,
+      anchorCloseAt: '2026-09-12T08:49:18.000Z',
+      blocks: [
+        {
+          closeAt: '2026-09-12T08:49:18.000Z',
+          openAt: '2026-09-12T04:49:18.000Z',
+          pools: {
+            CFB: [
+              { vault: '0xbig', payout: '3675000000000', paid: '3675000000000', contributions: 1, contributors: 1, payees: 1, units: { 'Common Strawberry': 1 } },
+              { vault: '0xmine', payout: '850000000000', paid: '850000000000', contributions: 3, contributors: 2, payees: 2, units: { 'Common Strawberry': 5, 'Common Moon Rock': 1 } },
+            ],
+          },
+        },
+      ],
+    }
+    const weightOf = (name: string) => (name === 'Common Strawberry' ? 10 : null)
+    const blocks = blocksFromSnapshot(snapshot, 'cfb', 850_000_000_000, weightOf)
+    expect(blocks).toHaveLength(1)
+    expect(blocks[0]?.vault).toBe('0xmine')
+    expect(blocks[0]?.totalWeight).toBe(50)
+    expect(blocks[0]?.unknown).toEqual(['Common Moon Rock'])
+    expect(blocks[0]?.key).toBe('cfb:2026-09-12T08:49:18.000Z')
+    expect(blocksFromSnapshot(snapshot, 'CFB', 1, weightOf)).toEqual([])
   })
 })

@@ -19,7 +19,7 @@ import {
   type SlotStat,
 } from '../lib/chain'
 import { loadBlocks } from '../lib/chainDb'
-import { nextSyncAt, syncCurrency, type SyncProgress } from '../lib/chainSync'
+import { loadSnapshot, nextSyncAt, syncCurrency, type SyncProgress } from '../lib/chainSync'
 import { formatBiopoints, formatDuration, formatExact } from '../lib/format'
 import type { Pools } from '../lib/types'
 import { useStore } from '../store'
@@ -477,6 +477,7 @@ export function MarketRate() {
   const [detail, setDetail] = useState<string | null>(null)
   const [manual, setManual] = useState(0)
   const [now, setNow] = useState(() => Date.now())
+  const [snapshotAt, setSnapshotAt] = useState<string | null>(null)
 
   // The countdown to the close is the one number on this page that moves on its own.
   useEffect(() => {
@@ -492,9 +493,13 @@ export function MarketRate() {
     const run = async () => {
       setPhase('reading')
       // What is already known shows immediately; the explorer only fills the gaps.
-      const cached = await Promise.all(currencies.map((currency) => loadBlocks(currency)))
+      const [cached, snapshot] = await Promise.all([
+        Promise.all(currencies.map((currency) => loadBlocks(currency))),
+        loadSnapshot(controller.signal),
+      ])
       if (controller.signal.aborted) return
       setBlocks(Object.fromEntries(currencies.map((currency, i) => [currency, cached[i] ?? []])))
+      setSnapshotAt(snapshot?.updatedAt ?? null)
 
       const results = await Promise.allSettled(
         currencies.map((currency) =>
@@ -502,6 +507,7 @@ export function MarketRate() {
             {
               pools,
               weightOf,
+              snapshot,
               signal: controller.signal,
               onProgress: (p) => setProgress((prev) => ({ ...prev, [currency]: p })),
               onBlock: (block) =>
@@ -555,7 +561,7 @@ export function MarketRate() {
       : phase === 'failed'
         ? 'The explorer did not answer for some blocks. What was read is shown; the rest is retried on the next pass.'
         : lastRun !== null
-          ? `Up to date as of ${timeFormat.format(new Date(lastRun))}${nextRun !== null ? ` · next read at ${timeFormat.format(new Date(nextRun))}` : ''}.`
+          ? `Up to date as of ${timeFormat.format(new Date(lastRun))}${nextRun !== null ? ` · next read at ${timeFormat.format(new Date(nextRun))}` : ''}${snapshotAt ? ` · shared history from ${dateTimeFormat.format(new Date(snapshotAt))}` : ' · no shared history on this site, reading the chain directly'}.`
           : 'Waiting to start.'
 
   return (

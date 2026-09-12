@@ -1,13 +1,17 @@
 import {
   HISTORY_BLOCKS,
+  SNAPSHOT_URL,
   blockCurrency,
   blockKey,
+  blocksFromSnapshot,
   explorerApi,
   findVault,
+  isSnapshot,
   readVault,
   settledCloses,
   tokenFor,
   type MarketBlock,
+  type Snapshot,
   type TokenTx,
   type WeightLookup,
 } from './chain'
@@ -37,6 +41,8 @@ export type ProgressListener = (progress: SyncProgress) => void
 export interface SyncOptions {
   pools: Pools
   weightOf: WeightLookup
+  /** The shared history, when the site serves one. Blocks in it are not read from the chain. */
+  snapshot?: Snapshot | null
   window?: number
   signal?: AbortSignal
   onProgress?: ProgressListener
@@ -147,6 +153,21 @@ async function readSettledBlock(
 }
 
 /**
+ * The shared history served next to the app, or null when there is none (local dev, a fork
+ * that has not enabled the workflow). Never an error: the chain path still works without it.
+ */
+export async function loadSnapshot(signal?: AbortSignal): Promise<Snapshot | null> {
+  try {
+    const response = await fetch(SNAPSHOT_URL, { signal, headers: { accept: 'application/json' } })
+    if (!response.ok) return null
+    const body: unknown = await response.json()
+    return isSnapshot(body) ? body : null
+  } catch {
+    return null
+  }
+}
+
+/**
  * Brings one currency's window up to date. Resolves with every block now in the window.
  *
  * The live block tells us the tier's payout, the schedule, and the block length; the rest is
@@ -169,6 +190,16 @@ export async function syncCurrency(options: SyncOptions, currency: string): Prom
   const stale = cached.filter((block) => !wanted.has(block.key)).map((block) => block.key)
   await deleteBlocks(stale)
   const have = new Map(cached.filter((block) => wanted.has(block.key)).map((block) => [block.key, block]))
+
+  // The shared history wins over the local cache: it is re-weighed with today's catalogue.
+  if (options.snapshot) {
+    for (const block of blocksFromSnapshot(options.snapshot, currency, live.payout, weightOf)) {
+      if (wanted.has(block.key)) {
+        have.set(block.key, block)
+        options.onBlock?.(block)
+      }
+    }
+  }
 
   const missing = closes.filter((closeAt) => !have.has(blockKey(currency, closeAt)))
   let done = 0

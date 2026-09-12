@@ -111,7 +111,7 @@ pnpm legal          # rebuilds public/privacy.html and public/terms.html from th
 
 ```
 data/            game data (seeds/animals generated, game.json hand-maintained)
-scripts/         python: doc extraction, icons, legal pages (stdlib only)
+scripts/         python: doc extraction, icons, legal pages; node: pools-history (stdlib only)
 src/lib/         types, catalog, yield model, optimizer  ← the actual product
                  chain.ts reads pool history off the explorer (docs/market-rate.md)
 src/components/  UI

@@ -40,6 +40,7 @@ data/            game data (seeds/animals generated, game.json hand-maintained)
 scripts/         python extractors that regenerate data/ and the extension lookup table
 src/lib/         types, catalog, yield model, optimizer  ← the actual product
                  chain.ts / chainSync.ts / chainDb.ts: pool history from the public explorer
+public/pools-history.json  shared pool history, appended hourly by scripts/pools-history.mjs (bot commits)
 src/components/  UI
 extension/       MV3 extension (inject → content-game → background → content-app → app)
 docs/design/     PRODUCT.md and DESIGN.md
