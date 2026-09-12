@@ -281,13 +281,12 @@ export async function syncCurrency(options: SyncOptions, currency: string): Prom
   const have = new Map(cached.filter((block) => wanted.has(block.key)).map((block) => [block.key, block]))
 
   // The shared history wins over the local cache: it is re-weighed with today's catalogue.
-  if (options.snapshot) {
-    for (const block of blocksFromSnapshot(options.snapshot, currency, live.payout, weightOf, closes)) {
-      if (wanted.has(block.key)) {
-        have.set(block.key, block)
-        options.onBlock?.(block)
-      }
-    }
+  const fromSnapshot = options.snapshot
+    ? blocksFromSnapshot(options.snapshot, currency, live.payout, weightOf, closes)
+    : []
+  for (const block of fromSnapshot.filter((candidate) => wanted.has(candidate.key))) {
+    have.set(block.key, block)
+    options.onBlock?.(block)
   }
 
   const missing = closes.filter((closeAt) => !have.has(blockKey(currency, closeAt)))
@@ -316,10 +315,9 @@ export async function syncCurrency(options: SyncOptions, currency: string): Prom
       } else {
         skipped += 1
       }
-    } catch (error) {
+    } catch {
       if (signal?.aborted) break
       skipped += 1
-      void error
     }
     done += 1
     report()

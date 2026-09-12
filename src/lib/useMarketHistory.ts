@@ -55,6 +55,18 @@ export interface MarketState {
 /** How often the open block's vault is re-read while the tab is open. */
 const LIVE_READ_MS = 5 * 60_000
 
+const withProgress =
+  (currency: string, progress: SyncProgress) => (prev: Record<string, SyncProgress>) => ({
+    ...prev,
+    [currency]: progress,
+  })
+
+const withBlock =
+  (currency: string, block: MarketBlock) => (prev: Record<string, MarketBlock[]>) => ({
+    ...prev,
+    [currency]: [...(new Map(Object.entries(prev)).get(currency) ?? []).filter((b) => b.key !== block.key), block],
+  })
+
 /**
  * Everything the pools tab knows about the market, in one hook.
  *
@@ -129,7 +141,7 @@ export function useMarketHistory(): MarketState {
         loadSnapshot(controller.signal),
       ])
       if (controller.signal.aborted) return
-      setBlocks(Object.fromEntries(currencies.map((currency, i) => [currency, cached[i] ?? []])))
+      setBlocks(Object.fromEntries(currencies.map((currency, i) => [currency, cached.at(i) ?? []])))
       setSnapshotAt(snapshot?.updatedAt ?? null)
       setSnapshotBlocks(snapshot?.blocks.length ?? 0)
 
@@ -141,12 +153,8 @@ export function useMarketHistory(): MarketState {
               weightOf,
               snapshot,
               signal: controller.signal,
-              onProgress: (p) => setProgress((prev) => ({ ...prev, [currency]: p })),
-              onBlock: (block) =>
-                setBlocks((prev) => ({
-                  ...prev,
-                  [currency]: [...(prev[currency] ?? []).filter((b) => b.key !== block.key), block],
-                })),
+              onProgress: (p) => setProgress(withProgress(currency, p)),
+              onBlock: (block) => setBlocks(withBlock(currency, block)),
             },
             currency,
           ),
@@ -192,20 +200,22 @@ export function useMarketHistory(): MarketState {
     const read = async () => {
       setReadingOpen(true)
       const failed: string[] = []
-      for (const key of opensKey.split('|')) {
-        const [currency, closesAt] = key.split(/:(.+)/) as [string, string | undefined]
-        if (!currency || !closesAt || controller.signal.aborted) continue
-        try {
-          const reading = await readOpenBlock({ pools, weightOf, signal: controller.signal }, currency, closesAt)
-          if (controller.signal.aborted) return
-          if (reading) setReadings((prev) => ({ ...prev, [currency]: reading }))
-          else failed.push(currency)
-        } catch {
-          // A vault the explorer will not serve is reported, not hidden: the page then says the
-          // weight is the capture's, and how old that is.
-          failed.push(currency)
-        }
-      }
+      await Promise.all(
+        opensKey.split('|').map(async (key) => {
+          const [currency, closesAt] = key.split(/:(.+)/) as [string, string | undefined]
+          if (!currency || !closesAt || controller.signal.aborted) return
+          try {
+            const reading = await readOpenBlock({ pools, weightOf, signal: controller.signal }, currency, closesAt)
+            if (controller.signal.aborted) return
+            if (reading) setReadings((prev) => ({ ...prev, [currency]: reading }))
+            else failed.push(currency)
+          } catch {
+            // A vault the explorer will not serve is reported, not hidden: the page then says the
+            // weight is the capture's, and how old that is.
+            failed.push(currency)
+          }
+        }),
+      )
       if (controller.signal.aborted) return
       setLiveFailed(failed)
       setReadingOpen(false)
@@ -220,10 +230,12 @@ export function useMarketHistory(): MarketState {
   }, [currencies, pools, weightOf, opensKey, manual])
 
   const histories = useMemo(
-    () =>
-      Object.fromEntries(
-        currencies.map((currency) => [currency, buildMarketHistory(currency, blocks[currency] ?? [])]),
-      ) as Record<string, MarketHistory>,
+    () => {
+      const byCurrency = new Map(Object.entries(blocks))
+      return Object.fromEntries(
+        currencies.map((currency) => [currency, buildMarketHistory(currency, byCurrency.get(currency) ?? [])]),
+      ) as Record<string, MarketHistory>
+    },
     [currencies, blocks],
   )
   const ranked = useMemo(

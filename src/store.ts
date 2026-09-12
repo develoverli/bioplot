@@ -103,7 +103,8 @@ function load(): Omit<Persisted, 'version'> {
     if (!raw) return defaults()
     const parsed = persistedSchema.safeParse(JSON.parse(raw))
     if (!parsed.success) return defaults()
-    const { version: _version, ...rest } = parsed.data
+    const rest: Omit<Persisted, 'version'> & { version?: Persisted['version'] } = { ...parsed.data }
+    delete rest.version
     return rest
   } catch {
     // A corrupt or unreadable store must never stop the app from opening.
@@ -221,8 +222,8 @@ export const useStore = create<StoreState>((set, get) => {
         )
         const seeds = [...state.inventory.seeds]
         if (existing >= 0) {
-          const current = seeds[existing]!
-          seeds[existing] = { ...current, count: current.count + stack.count }
+          const current = seeds.at(existing)!
+          seeds.splice(existing, 1, { ...current, count: current.count + stack.count })
         } else {
           seeds.push(stack)
         }

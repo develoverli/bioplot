@@ -136,7 +136,7 @@ export function SetupDialog({ open, onClose }: { open: boolean; onClose: () => v
               <a href={EXTENSION_URL} target="_blank" rel="noreferrer noopener">
                 Install the extension
               </a>
-              , then reload this page.
+              {', then reload this page.'}
             </>
           ) : (
             <>
@@ -178,7 +178,7 @@ export function SetupDialog({ open, onClose }: { open: boolean; onClose: () => v
           </p>
           {countArtwork(status.result.catalogue) > 0 ? (
             <p className="mt-1 text-xs text-faint">
-              {countArtwork(status.result.catalogue)} sprites and the game's own biopoint weights
+              {countArtwork(status.result.catalogue)} sprites and the game&apos;s own biopoint weights
               came with it.
             </p>
           ) : null}

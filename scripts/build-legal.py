@@ -59,8 +59,45 @@ def inline(text: str) -> str:
     out = re.sub(r"`([^`]+)`", r"<code>\1</code>", out)
     # Bare URLs and addresses are common in these two files and worth linking.
     out = re.sub(r"(?<!\")(https?://[^\s<]+)", r'<a href="\1">\1</a>', out)
-    out = re.sub(r"(?<![\w>/])([\w.+-]+@[\w-]+\.[\w.-]+)", r'<a href="mailto:\1">\1</a>', out)
+    out = re.sub(r"(?<![\w.+>/-])([\w.+-]+@[\w-]+\.[\w.-]+)", r'<a href="mailto:\1">\1</a>', out)
     return out
+
+
+def flush_blocks(body: list[str], paragraph: list[str], bullets: list[str]) -> None:
+    """Close the open paragraph and bullet list, if any, into the body."""
+    if paragraph:
+        body.append(f"<p>{inline(' '.join(paragraph))}</p>")
+        paragraph.clear()
+    if bullets:
+        items = "".join(f"<li>{inline(item)}</li>" for item in bullets)
+        body.append(f"<ul>{items}</ul>")
+        bullets.clear()
+
+
+def render_line(line: str, body: list[str], paragraph: list[str], bullets: list[str]) -> str | None:
+    """Handles one non-blank line; returns the title when the line is the page heading."""
+    if line.startswith("# "):
+        flush_blocks(body, paragraph, bullets)
+        title = line[2:].strip()
+        body.append(f"<h1>{inline(title)}</h1>")
+        return title
+    if line.startswith("## "):
+        flush_blocks(body, paragraph, bullets)
+        body.append(f"<h2>{inline(line[3:].strip())}</h2>")
+        return None
+    if line.startswith("- "):
+        if paragraph:
+            flush_blocks(body, paragraph, bullets)
+        bullets.append(line[2:].strip())
+        return None
+    if bullets and line.startswith("  "):
+        # A wrapped bullet belongs to the bullet above it, not to a new one.
+        bullets[-1] += " " + line.strip()
+        return None
+    if bullets:
+        flush_blocks(body, paragraph, bullets)
+    paragraph.append(line.strip())
+    return None
 
 
 def render(markdown: str) -> tuple[str, str]:
@@ -70,42 +107,18 @@ def render(markdown: str) -> tuple[str, str]:
     paragraph: list[str] = []
     bullets: list[str] = []
 
-    def flush() -> None:
-        if paragraph:
-            body.append(f"<p>{inline(' '.join(paragraph))}</p>")
-            paragraph.clear()
-        if bullets:
-            items = "".join(f"<li>{inline(item)}</li>" for item in bullets)
-            body.append(f"<ul>{items}</ul>")
-            bullets.clear()
-
     for raw in markdown.splitlines():
         line = raw.rstrip()
 
         if not line.strip():
-            flush()
+            flush_blocks(body, paragraph, bullets)
             continue
 
-        if line.startswith("# "):
-            flush()
-            title = line[2:].strip()
-            body.append(f"<h1>{inline(title)}</h1>")
-        elif line.startswith("## "):
-            flush()
-            body.append(f"<h2>{inline(line[3:].strip())}</h2>")
-        elif line.startswith("- "):
-            if paragraph:
-                flush()
-            bullets.append(line[2:].strip())
-        elif bullets and line.startswith("  "):
-            # A wrapped bullet belongs to the bullet above it, not to a new one.
-            bullets[-1] += " " + line.strip()
-        else:
-            if bullets:
-                flush()
-            paragraph.append(line.strip())
+        heading = render_line(line, body, paragraph, bullets)
+        if heading is not None:
+            title = heading
 
-    flush()
+    flush_blocks(body, paragraph, bullets)
     return title, "\n      ".join(body)
 
 

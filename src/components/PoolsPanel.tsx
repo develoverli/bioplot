@@ -29,6 +29,74 @@ function hourLabel(hour: number): string {
   return `${String(hour).padStart(2, '0')}:00`
 }
 
+type PoolHistory = ReturnType<typeof buildPoolHistory>
+
+function renderBestHours(history: PoolHistory) {
+  const blockWord = history.count === 1 ? 'block' : 'blocks'
+  return history.bestHours.length > 0 ? (
+    <div className="mt-3">
+      <p className="flex items-center gap-1.5 text-xs font-medium text-ink">
+        <Clock size={13} aria-hidden="true" className="text-muted" />
+        Your best blocks so far, by what a biopoint earned you
+      </p>
+      <ul className="mt-1.5 flex flex-wrap gap-1.5">
+        {history.bestHours.map((hour) => (
+          <li key={hour.hour} className="tabular rounded-lg border border-line bg-surface-2 px-2 py-1 text-xs">
+            <span className="font-semibold text-accent">{hourLabel(hour.hour)}</span>
+            <span className="mx-1.5 text-faint">·</span>
+            <span className="text-muted">{hour.blocks} block{hour.blocks === 1 ? '' : 's'}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-1.5 text-xs text-faint">
+        {history.thin
+          ? `Only ${history.count} settled ${blockWord} of yours so far; the market section above is the one with enough data.`
+          : 'From your own settled blocks; the market section above covers every block, yours or not.'}
+      </p>
+    </div>
+  ) : null
+}
+
+function renderPaid(history: PoolHistory) {
+  return history.count > 0 ? (
+    <div className="border-t border-line pt-3">
+      <h3 className="text-sm font-semibold text-ink">What you have been paid</h3>
+
+      <div className="mt-2 overflow-x-auto scroll-thin">
+        <table className="w-full min-w-[26rem] border-collapse text-sm">
+          <thead>
+            <tr className="text-left text-xs tracking-wide text-faint uppercase">
+              <th scope="col" className="py-1.5 pr-3 font-medium">Currency</th>
+              <th scope="col" className="px-3 py-1.5 text-right font-medium">24h</th>
+              <th scope="col" className="px-3 py-1.5 text-right font-medium">7 days</th>
+              <th scope="col" className="px-3 py-1.5 text-right font-medium">30 days</th>
+              <th scope="col" className="py-1.5 pl-3 text-right font-medium">Blocks</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[color:var(--border)]">
+            {history.totals.map((total) => (
+              <tr key={total.currency}>
+                <td className="py-1.5 pr-3 text-ink">{total.currency}</td>
+                <td className="tabular px-3 py-1.5 text-right text-ink">{scaled(total.day, '')}</td>
+                <td className="tabular px-3 py-1.5 text-right text-muted">{scaled(total.week, '')}</td>
+                <td className="tabular px-3 py-1.5 text-right text-muted">{scaled(total.month, '')}</td>
+                <td className="tabular py-1.5 pl-3 text-right text-faint">{total.blocks}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {renderBestHours(history)}
+    </div>
+  ) : (
+    <p className="text-xs text-faint">
+      No settled blocks of yours captured yet. Reload the farm page in chainers.io and sync again; your own
+      earnings appear here once the game has reported them.
+    </p>
+  )
+}
+
 /**
  * The pools tab: what tier you are in, what is in the pools right now, where the bag should
  * go and when, what each closing hour usually looks like, and what you have been paid.
@@ -94,68 +162,11 @@ export function PoolsPanel({ bare = false }: { bare?: boolean }) {
 
         <p className="text-xs text-faint">
           A block pays a fixed amount split by contributed weight, so a biopoint earns most in the blocks few
-          people send to. Estimates add your bag to the block and assume it ends near this hour's usual weight.
+          people send to. Estimates add your bag to the block and assume it ends near this hour&apos;s usual weight.
           Nothing here touches your game.
         </p>
 
-        {history.count > 0 ? (
-          <div className="border-t border-line pt-3">
-            <h3 className="text-sm font-semibold text-ink">What you have been paid</h3>
-
-            <div className="mt-2 overflow-x-auto scroll-thin">
-              <table className="w-full min-w-[26rem] border-collapse text-sm">
-                <thead>
-                  <tr className="text-left text-xs tracking-wide text-faint uppercase">
-                    <th scope="col" className="py-1.5 pr-3 font-medium">Currency</th>
-                    <th scope="col" className="px-3 py-1.5 text-right font-medium">24h</th>
-                    <th scope="col" className="px-3 py-1.5 text-right font-medium">7 days</th>
-                    <th scope="col" className="px-3 py-1.5 text-right font-medium">30 days</th>
-                    <th scope="col" className="py-1.5 pl-3 text-right font-medium">Blocks</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[color:var(--border)]">
-                  {history.totals.map((total) => (
-                    <tr key={total.currency}>
-                      <td className="py-1.5 pr-3 text-ink">{total.currency}</td>
-                      <td className="tabular px-3 py-1.5 text-right text-ink">{scaled(total.day, '')}</td>
-                      <td className="tabular px-3 py-1.5 text-right text-muted">{scaled(total.week, '')}</td>
-                      <td className="tabular px-3 py-1.5 text-right text-muted">{scaled(total.month, '')}</td>
-                      <td className="tabular py-1.5 pl-3 text-right text-faint">{total.blocks}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {history.bestHours.length > 0 ? (
-              <div className="mt-3">
-                <p className="flex items-center gap-1.5 text-xs font-medium text-ink">
-                  <Clock size={13} aria-hidden="true" className="text-muted" />
-                  Your best blocks so far, by what a biopoint earned you
-                </p>
-                <ul className="mt-1.5 flex flex-wrap gap-1.5">
-                  {history.bestHours.map((hour) => (
-                    <li key={hour.hour} className="tabular rounded-lg border border-line bg-surface-2 px-2 py-1 text-xs">
-                      <span className="font-semibold text-accent">{hourLabel(hour.hour)}</span>
-                      <span className="mx-1.5 text-faint">·</span>
-                      <span className="text-muted">{hour.blocks} block{hour.blocks === 1 ? '' : 's'}</span>
-                    </li>
-                  ))}
-                </ul>
-                <p className="mt-1.5 text-xs text-faint">
-                  {history.thin
-                    ? `Only ${history.count} settled block${history.count === 1 ? '' : 's'} of yours so far; the market section above is the one with enough data.`
-                    : 'From your own settled blocks; the market section above covers every block, yours or not.'}
-                </p>
-              </div>
-            ) : null}
-          </div>
-        ) : (
-          <p className="text-xs text-faint">
-            No settled blocks of yours captured yet. Reload the farm page in chainers.io and sync again; your own
-            earnings appear here once the game has reported them.
-          </p>
-        )}
+        {renderPaid(history)}
       </div>
     </Frame>
   )

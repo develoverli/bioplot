@@ -49,12 +49,11 @@ function indexCatalogue(catalogue: Catalogue): Map<string, CatalogueEntry> {
 export function buildEffectiveSeeds(catalogue: Catalogue): EffectiveSeeds {
   const live = indexCatalogue(catalogue)
 
-  const matchedKeys = new Set<string>()
   let liveVariants = 0
   let docVariants = 0
 
   const seeds = docSeeds.map((seed) => {
-    const variants: Seed['variants'] = {}
+    const variantEntries: [Rarity, NonNullable<Seed['variants'][Rarity]>][] = []
 
     for (const [rarity, variant] of Object.entries(seed.variants) as [Rarity, Seed['variants'][Rarity]][]) {
       if (!variant) continue
@@ -65,18 +64,21 @@ export function buildEffectiveSeeds(catalogue: Catalogue): EffectiveSeeds {
       const growthSec = entry?.growthSec ?? null
 
       if (biopoints !== null || growthSec !== null) {
-        matchedKeys.add(key)
         liveVariants += 1
       } else {
         docVariants += 1
       }
 
-      variants[rarity] = {
-        biopoints: biopoints ?? variant.biopoints,
-        growthSec: growthSec ?? variant.growthSec,
-      }
+      variantEntries.push([
+        rarity,
+        {
+          biopoints: biopoints ?? variant.biopoints,
+          growthSec: growthSec ?? variant.growthSec,
+        },
+      ])
     }
 
+    const variants: Seed['variants'] = Object.fromEntries(variantEntries)
     return { ...seed, variants }
   })
 

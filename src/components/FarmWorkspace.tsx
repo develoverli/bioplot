@@ -1,26 +1,38 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { Check, Leaf, Lightbulb, Lock } from 'lucide-react'
 import { buildCodeIconLookup, buildIconLookup } from '../lib/artwork'
-import { attendanceSec } from '../lib/attendance'
-import { buildFeedReport, type FarmAnimal, type FeedChoice } from '../lib/feed'
+import { attendanceSec, type Attendance } from '../lib/attendance'
+import {
+  buildFeedReport,
+  type FarmAnimal,
+  type FeedChoice,
+  type FeedNeed,
+  type FeedReport,
+} from '../lib/feed'
 import { lands } from '../lib/catalog'
 import { formatBiopoints, formatDuration, formatExact, titleCase } from '../lib/format'
-import { applyLampPlan, inventoryWith, planLamps } from '../lib/layout'
-import { optimize, type Plan, type PlanEntry, type PlotPlan } from '../lib/optimizer'
-import type { Garden, Rarity, Seed } from '../lib/types'
+import { applyLampPlan, inventoryWith, planLamps, type LampPlan } from '../lib/layout'
+import {
+  optimize,
+  type OptimizeOptions,
+  type Plan,
+  type PlanEntry,
+  type PlotPlan,
+} from '../lib/optimizer'
+import type { Garden, GardenBed, Inventory, Rarity, Seed } from '../lib/types'
 import { useStore } from '../store'
 import { FarmField, fieldMaxWidth } from './FarmField'
 import { FeedAdvice } from './FeedAdvice'
 import { RarityBadge, TabPanel } from './ui'
 import { FarmSummary, PickPlotPlaceholder, WorkspaceShell } from './WorkspaceShell'
 
-const RARITY_VAR: Record<Rarity, string> = {
-  common: 'var(--rarity-common)',
-  uncommon: 'var(--rarity-uncommon)',
-  rare: 'var(--rarity-rare)',
-  epic: 'var(--rarity-epic)',
-  legendary: 'var(--rarity-legendary)',
-}
+const RARITY_VAR = new Map<Rarity, string>([
+  ['common', 'var(--rarity-common)'],
+  ['uncommon', 'var(--rarity-uncommon)'],
+  ['rare', 'var(--rarity-rare)'],
+  ['epic', 'var(--rarity-epic)'],
+  ['legendary', 'var(--rarity-legendary)'],
+])
 
 const RARITY_ORDER: Rarity[] = ['common', 'uncommon', 'rare', 'epic', 'legendary']
 
@@ -29,6 +41,12 @@ function byBed(source: Plan | null): Map<string, PlotPlan> {
   const map = new Map<string, PlotPlan>()
   for (const plotPlan of source?.plots ?? []) map.set(plotPlan.groupId, plotPlan)
   return map
+}
+
+function landTabClass(active: boolean, owned: boolean): string {
+  if (active) return 'border-[color:var(--accent)] bg-accent-dim text-accent'
+  if (owned) return 'border-line bg-surface-2 text-ink hover:border-line-strong'
+  return 'border-line bg-surface text-faint'
 }
 
 function LandTabs({
@@ -56,13 +74,7 @@ function LandTabs({
             disabled={!owned}
             onClick={() => onPick(land.id)}
             title={owned ? land.name : `${land.name} — not on your account`}
-            className={`inline-flex min-h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold transition-colors duration-150 ${
-              active
-                ? 'border-[color:var(--accent)] bg-accent-dim text-accent'
-                : owned
-                  ? 'border-line bg-surface-2 text-ink hover:border-line-strong'
-                  : 'border-line bg-surface text-faint'
-            }`}
+            className={`inline-flex min-h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold transition-colors duration-150 ${landTabClass(active, owned)}`}
           >
             {owned ? (
               <Leaf size={13} aria-hidden="true" className={active ? '' : 'text-muted'} />
@@ -114,7 +126,7 @@ function BedSchedule({ entries, horizonSec }: { entries: PlanEntry[]; horizonSec
             className="h-full"
             style={{
               width: `${(step.span / horizonSec) * 100}%`,
-              background: RARITY_VAR[step.entry.rarity],
+              background: RARITY_VAR.get(step.entry.rarity),
             }}
           />
         ))}
@@ -139,14 +151,14 @@ function BedSchedule({ entries, horizonSec }: { entries: PlanEntry[]; horizonSec
                 <span
                   aria-hidden="true"
                   className="size-7 rounded border-2"
-                  style={{ borderColor: RARITY_VAR[entry.rarity] }}
+                  style={{ borderColor: RARITY_VAR.get(entry.rarity) }}
                 />
               )}
 
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-ink" title={entry.seedName}>
                   {/* "Seed" on every row is noise; the column is narrow and the word is implied. */}
-                  {entry.seedName.replace(/\s*seeds?$/i, '')}
+                  {entry.seedName.replace(/seeds?$/i, '').trimEnd()}
                   {entry.plantings > 1 ? (
                     <span className="tabular ml-1.5 text-muted">×{entry.plantings}</span>
                   ) : null}
@@ -181,20 +193,58 @@ function BedSchedule({ entries, horizonSec }: { entries: PlanEntry[]; horizonSec
  * only way to see that is to show both recipes with what you hold of each ingredient. "You have
  * no feed" hides it; this does not.
  */
+function feedStatus(choice: FeedChoice, known: boolean, shortCount: number): string {
+  if (choice.owned > 0) return `${choice.owned} in your bag`
+  if (choice.craftable > 0) return `craft ${choice.craftable} now`
+  // "Ready to craft" with no recipe under it was a promise the capture cannot back. An unknown
+  // recipe is unknown, not satisfied.
+  if (!known) return 'recipe not captured'
+  if (shortCount === 0) return 'ready to craft'
+  return 'cannot make yet'
+}
+
+function statToneClass(tone: 'warning' | 'ink' | undefined): string {
+  if (tone === 'warning') return 'text-[color:var(--warning)]'
+  if (tone === 'ink') return 'text-ink'
+  return 'text-muted'
+}
+
+function seedClass(need: FeedNeed): string {
+  if (need.hasSeed) return 'text-accent'
+  if (need.owned < need.count) return 'text-[color:var(--danger)]'
+  return 'text-[color:var(--warning)]'
+}
+
+function renderNeed(need: FeedNeed) {
+  return (
+    <li key={need.code} className="tabular flex flex-wrap items-baseline gap-x-2">
+      <span className={need.owned >= need.count ? 'text-muted' : 'text-ink'}>
+        {need.count}× {need.name}
+      </span>
+      <span className={need.owned >= need.count ? 'text-faint' : 'text-[color:var(--danger)]'}>
+        you have {need.owned}
+      </span>
+      <span className={seedClass(need)}>
+        {need.hasSeed ? `seed owned: ${need.seed}` : `no seed: ${need.seed}`}
+      </span>
+    </li>
+  )
+}
+
+function shortAdvice(short: FeedNeed[]): string {
+  return short.every((need) => need.hasSeed)
+    ? 'You own the seeds: grow them and this feed is yours.'
+    : `Buy ${short
+        .filter((need) => !need.hasSeed)
+        .map((need) => need.seed)
+        .join(' and ')} and it never runs out.`
+}
+
 function FeedRecipe({ choice, best }: { choice: FeedChoice; best: boolean }) {
   const short = choice.needs.filter((need) => need.owned < need.count)
   const known = choice.needs.length > 0
-  // "Ready to craft" with no recipe under it was a promise the capture cannot back. An unknown
-  // recipe is unknown, not satisfied.
-  const status = choice.owned > 0
-    ? `${choice.owned} in your bag`
-    : choice.craftable > 0
-      ? `craft ${choice.craftable} now`
-      : !known
-        ? 'recipe not captured'
-        : short.length === 0
-          ? 'ready to craft'
-          : 'cannot make yet'
+  const status = feedStatus(choice, known, short.length)
+  const available = choice.owned > 0 || choice.craftable > 0
 
   return (
     <li
@@ -210,7 +260,7 @@ function FeedRecipe({ choice, best }: { choice: FeedChoice; best: boolean }) {
             width={26}
             height={26}
             className="size-6.5 shrink-0"
-            style={choice.owned > 0 || choice.craftable > 0 ? undefined : { filter: 'grayscale(1)', opacity: 0.55 }}
+            style={available ? undefined : { filter: 'grayscale(1)', opacity: 0.55 }}
           />
         ) : null}
         <span className="min-w-0 flex-1">
@@ -219,7 +269,7 @@ function FeedRecipe({ choice, best }: { choice: FeedChoice; best: boolean }) {
         </span>
         <span
           className={`tabular shrink-0 text-xs font-medium ${
-            choice.owned > 0 || choice.craftable > 0 ? 'text-accent' : 'text-faint'
+            available ? 'text-accent' : 'text-faint'
           }`}
         >
           {status}
@@ -228,27 +278,7 @@ function FeedRecipe({ choice, best }: { choice: FeedChoice; best: boolean }) {
 
       {choice.needs.length > 0 ? (
         <ul className="mt-1.5 flex flex-col gap-0.5 text-xs">
-          {choice.needs.map((need) => (
-            <li key={need.code} className="tabular flex flex-wrap items-baseline gap-x-2">
-              <span className={need.owned >= need.count ? 'text-muted' : 'text-ink'}>
-                {need.count}× {need.name}
-              </span>
-              <span className={need.owned >= need.count ? 'text-faint' : 'text-[color:var(--danger)]'}>
-                you have {need.owned}
-              </span>
-              <span
-                className={
-                  need.hasSeed
-                    ? 'text-accent'
-                    : need.owned < need.count
-                      ? 'text-[color:var(--danger)]'
-                      : 'text-[color:var(--warning)]'
-                }
-              >
-                {need.hasSeed ? `seed owned: ${need.seed}` : `no seed: ${need.seed}`}
-              </span>
-            </li>
-          ))}
+          {choice.needs.map((need) => renderNeed(need))}
         </ul>
       ) : (
         <p className="mt-1 text-xs text-faint">
@@ -264,12 +294,7 @@ function FeedRecipe({ choice, best }: { choice: FeedChoice; best: boolean }) {
             .map((need) => `${need.count - need.owned} ${need.name}`)
             .join(' and ')}
           .{' '}
-          {short.every((need) => need.hasSeed)
-            ? 'You own the seeds: grow them and this feed is yours.'
-            : `Buy ${short
-                .filter((need) => !need.hasSeed)
-                .map((need) => need.seed)
-                .join(' and ')} and it never runs out.`}
+          {shortAdvice(short)}
         </p>
       ) : null}
     </li>
@@ -294,7 +319,7 @@ function FeedLadder({ animal }: { animal: FarmAnimal }) {
               <span className="font-medium text-ink">
                 {animal.feeding.replace(/_/g, ' ')}
               </span>
-              , but that feed is not in the captured catalogue, so its recipe cannot be shown.
+              {', but that feed is not in the captured catalogue, so its recipe cannot be shown.'}
             </>
           ) : (
             <>No feed for this animal appears anywhere in the capture.</>
@@ -302,7 +327,7 @@ function FeedLadder({ animal }: { animal: FarmAnimal }) {
         </p>
         <p className="mt-1 text-xs text-faint">
           Reload the farm page in chainers.io, then sync again. Naming its
-          ingredients without the game's recipe would be a guess, and a wrong shopping list is
+          ingredients without the game&apos;s recipe would be a guess, and a wrong shopping list is
           worse than none.
         </p>
       </div>
@@ -322,7 +347,7 @@ function FeedLadder({ animal }: { animal: FarmAnimal }) {
         ))}
       </ul>
       <p className="mt-1.5 text-xs text-faint">
-        Ingredients must match the feed's rarity. A rarer feed is always worth more.
+        Ingredients must match the feed&apos;s rarity. A rarer feed is always worth more.
       </p>
     </div>
   )
@@ -476,13 +501,7 @@ function StatsStrip({
           >
             <dt className="truncate text-xs text-faint">{stat.label}</dt>
             <dd
-              className={`tabular m-0 text-sm font-semibold ${
-                stat.tone === 'warning'
-                  ? 'text-[color:var(--warning)]'
-                  : stat.tone === 'ink'
-                    ? 'text-ink'
-                    : 'text-muted'
-              }`}
+              className={`tabular m-0 text-sm font-semibold ${statToneClass(stat.tone)}`}
             >
               {formatBiopoints(stat.value)}
             </dd>
@@ -490,6 +509,352 @@ function StatsStrip({
         ))}
       </dl>
     </div>
+  )
+}
+
+/** Every pen's recommended feed, so the field can draw it without redoing the work per plot. */
+function feedByPenOf(feedReport: FeedReport): Map<string, string> {
+  const map = new Map<string, string>()
+  for (const animal of feedReport.animals) {
+    // Falls through to the plain best-fitting feed so a pen always has a sprite to draw:
+    // a greyed-out picture of the food says far more than an empty square with a cross.
+    const feed =
+      animal.sustainable ?? animal.best ?? animal.obtainable ?? animal.feeds[0] ?? null
+    if (feed) map.set(animal.id, feed.code)
+  }
+  return map
+}
+
+/** Pens whose feed is not on hand: the sprite is drawn faded so the state is visible. */
+function pensWithoutFeedOnHand(feedReport: FeedReport): Set<string> {
+  return new Set(
+    feedReport.animals
+      .filter((animal) => (animal.sustainable ?? animal.best) === null)
+      .map((animal) => animal.id),
+  )
+}
+
+/** Pens with no feed at all, owned or craftable. */
+function pensWithNoFeed(feedReport: FeedReport): Set<string> {
+  return new Set(
+    feedReport.animals
+      .filter((animal) => !animal.sustainable && !animal.best && !animal.obtainable)
+      .map((animal) => animal.id),
+  )
+}
+
+function lampPlanFor(
+  live: Garden | undefined,
+  horizonSec: number,
+  seedCatalogue: Seed[],
+  plantingMode: 'mix' | 'single',
+  attendance: Attendance,
+): LampPlan | null {
+  return live
+    ? planLamps(live, horizonSec, seedCatalogue, plantingMode, attendanceSec(attendance))
+    : null
+}
+
+function idealGardenFor(live: Garden | undefined, lampPlan: LampPlan | null): Garden | null {
+  return live && lampPlan ? applyLampPlan(live, lampPlan) : null
+}
+
+function idealPlanFor(
+  idealGarden: Garden | null,
+  inventory: Inventory,
+  options: OptimizeOptions,
+): Plan | null {
+  return idealGarden ? optimize(inventoryWith(inventory, idealGarden), options) : null
+}
+
+/**
+ * Only the plots that GAIN a lamp.
+ *
+ * A plot losing its lamp also "changed", but marking it the same way and labelling the
+ * marker "move a lamp here" pointed at plots the ideal deliberately leaves dark. The two
+ * are opposite instructions and cannot share a border.
+ */
+function bedsGainingLamp(live: Garden | undefined, lampPlan: LampPlan | null): Set<string> {
+  if (!live || !lampPlan) return new Set<string>()
+  return new Set(
+    live.beds
+      .filter((bed) => {
+        const next = lampPlan.assignment.get(bed.id) ?? null
+        if (next === null || next === bed.lamp) return false
+        return bed.lamp === null || RARITY_ORDER.indexOf(next) > RARITY_ORDER.indexOf(bed.lamp)
+      })
+      .map((bed) => bed.id),
+  )
+}
+
+function lampGain(lampPlan: LampPlan | null) {
+  const gain = lampPlan ? lampPlan.bestBiopoints - lampPlan.currentBiopoints : 0
+  // Whether moving a lamp is worth anything. The ideal view exists either way: even with the
+  // lamps already right, it is the one where every pen runs the best feed you can make.
+  const canImprove = gain > 1 && (lampPlan?.moved ?? 0) > 0
+  return { gain, canImprove }
+}
+
+function pickView({
+  showIdealLayout,
+  live,
+  idealGarden,
+  idealPlan,
+  planNow,
+  planIdeal,
+  feedReport,
+}: {
+  showIdealLayout: boolean
+  live: Garden | undefined
+  idealGarden: Garden | null
+  idealPlan: Plan | null
+  planNow: Map<string, PlotPlan>
+  planIdeal: Map<string, PlotPlan>
+  feedReport: FeedReport
+}) {
+  const hasIdeal = Boolean(idealGarden && idealPlan)
+  const ideal = showIdealLayout && hasIdeal
+  const garden = ideal && idealGarden ? idealGarden : live
+  // In the ideal view the animals run the best feed you can actually make.
+  const animalDay = ideal ? feedReport.idealBiopointsPerDay : feedReport.biopointsPerDay
+  const planByBed = ideal ? planIdeal : planNow
+  return { hasIdeal, ideal, garden, animalDay, planByBed }
+}
+
+function sumBeds(
+  beds: GardenBed[],
+  plans: Map<string, PlotPlan>,
+  key: 'biopointsPerPlot' | 'biopointsLucky' | 'biopointsPlain',
+): number {
+  return beds.reduce((sum, bed) => sum + (plans.get(bed.id)?.[key] ?? 0), 0)
+}
+
+function farmTotals({
+  garden,
+  live,
+  planByBed,
+  planNow,
+  planIdeal,
+  idealGarden,
+  idealPlan,
+  feedReport,
+}: {
+  garden: Garden
+  live: Garden
+  planByBed: Map<string, PlotPlan>
+  planNow: Map<string, PlotPlan>
+  planIdeal: Map<string, PlotPlan>
+  idealGarden: Garden | null
+  idealPlan: Plan | null
+  feedReport: FeedReport
+}) {
+  const total = sumBeds(garden.beds, planByBed, 'biopointsPerPlot')
+  // Both views, always: the page never shows one number without the other beside it.
+  const nowPerDay = sumBeds(live.beds, planNow, 'biopointsPerPlot') + feedReport.biopointsPerDay
+  const idealPerDay =
+    idealGarden && idealPlan
+      ? sumBeds(idealGarden.beds, planIdeal, 'biopointsPerPlot') + feedReport.idealBiopointsPerDay
+      : nowPerDay
+  const totalLucky = sumBeds(garden.beds, planByBed, 'biopointsLucky')
+  const totalPlain = sumBeds(garden.beds, planByBed, 'biopointsPlain')
+  return { total, nowPerDay, idealPerDay, totalLucky, totalPlain }
+}
+
+function farmCounts(garden: Garden, planByBed: Map<string, PlotPlan>) {
+  // A plot left empty is almost always a seed shortage, not a bug, and the player can only
+  // act on it if the page says so.
+  const soil = garden.beds.filter((bed) => !bed.isAnimal)
+  const animals = garden.beds.filter((bed) => bed.isAnimal)
+  const hungry = animals.filter((bed) => !bed.plantedSeedCode).length
+  const idleBeds = soil.filter((bed) => (planByBed.get(bed.id)?.entries.length ?? 0) === 0).length
+  const landName = lands.find((land) => land.id === garden.landId)?.name ?? garden.landId
+  return { soil, animals, hungry, idleBeds, landName }
+}
+
+function buildStats({
+  totalLucky,
+  totalPlain,
+  total,
+  hasOutput,
+  animalCount,
+  animalDay,
+  horizonSec,
+}: {
+  totalLucky: number
+  totalPlain: number
+  total: number
+  hasOutput: boolean
+  animalCount: number
+  animalDay: number
+  horizonSec: number
+}): Stat[] {
+  const stats: Stat[] = []
+  // Luck is the difference between a flat day and a great one.
+  if (totalLucky > totalPlain) {
+    stats.push({ label: 'lucky', value: totalLucky, exact: formatExact(totalLucky), tone: 'warning' })
+    stats.push({ label: 'flat', value: totalPlain, exact: formatExact(totalPlain) })
+  }
+  // Crops and animals are two different engines; the farm is the sum.
+  if (hasOutput) {
+    stats.push({ label: 'from plots', value: total, exact: formatExact(total) })
+    stats.push({
+      label: `from ${animalCount} animal${animalCount === 1 ? '' : 's'}`,
+      value: animalDay,
+      exact: formatExact(animalDay),
+      tone: 'ink',
+    })
+  }
+  stats.push({ label: 'per hour', value: total / (horizonSec / 3600) })
+  stats.push({ label: 'per pool', value: total / (horizonSec / 14_400) })
+  return stats
+}
+
+function renderIdealToggle(
+  ideal: boolean,
+  canImprove: boolean,
+  gain: number,
+  onToggle: () => void,
+) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={ideal}
+      onClick={onToggle}
+      className={`inline-flex min-h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold transition-colors duration-150 ${
+        ideal
+          ? 'border-[color:var(--accent)] bg-accent-dim text-accent'
+          : 'border-line bg-surface-2 text-ink hover:border-line-strong'
+      }`}
+    >
+      <span
+        aria-hidden="true"
+        className={`flex size-3.5 shrink-0 items-center justify-center rounded-full border-2 ${
+          ideal
+            ? 'border-[color:var(--accent)] bg-accent text-[color:var(--accent-contrast)]'
+            : 'border-line-strong'
+        }`}
+      >
+        {ideal ? <Check size={9} strokeWidth={3.5} /> : null}
+      </span>
+      <Lightbulb size={13} aria-hidden="true" />
+      Ideal
+      {canImprove ? (
+        <span className="tabular font-medium opacity-80">+{formatBiopoints(gain)}</span>
+      ) : null}
+    </button>
+  )
+}
+
+function renderLayoutNote(
+  ideal: boolean,
+  canImprove: boolean,
+  gain: number,
+  lampPlan: LampPlan | null,
+  gainPerDay: number,
+) {
+  if (ideal) {
+    return canImprove ? (
+      <>
+        Lamps shown where they should be. Dashed plots are the ones to move a lamp
+        onto:{' '}
+        <span className="tabular font-semibold text-accent">
+          +{formatBiopoints(gain)}
+        </span>{' '}
+        bp / day. Pens run the best feed you can make. Nothing is changed in your game.
+      </>
+    ) : (
+      <>
+        Your lamps are already where they should be. Pens run the best feed you can
+        make; switch to Now for what is actually growing.
+      </>
+    )
+  }
+  return canImprove ? (
+    <>
+      Your farm as it is. Moving {lampPlan?.movedLamps ?? 0} lamp
+      {(lampPlan?.movedLamps ?? 0) === 1 ? '' : 's'} and feeding every pen its best is
+      worth{' '}
+      <span className="tabular font-semibold text-accent">
+        +{formatBiopoints(gainPerDay)}
+      </span>{' '}
+      bp / day.
+    </>
+  ) : (
+    <>Your farm as it is, with what is growing right now.</>
+  )
+}
+
+function renderHungryNote(hungry: number, feedReport: FeedReport) {
+  return hungry > 0 ? (
+    <p className="mt-2 text-xs text-[color:var(--warning)]">
+      {hungry} animal{hungry === 1 ? '' : 's'} with nothing growing
+      {feedReport.hasOutput &&
+      feedReport.idealBiopointsPerDay > feedReport.biopointsPerDay ? (
+        <>
+          . Feeding every pen its best would add{' '}
+          <span className="tabular font-semibold">
+            {formatBiopoints(
+              feedReport.idealBiopointsPerDay - feedReport.biopointsPerDay,
+            )}
+          </span>{' '}
+          bp / day.
+        </>
+      ) : (
+        '. Feed is crafted from your harvest; the Animals tab shows what you can make.'
+      )}
+    </p>
+  ) : null
+}
+
+function renderIdleNote(idleBeds: number) {
+  return idleBeds > 0 ? (
+    <p className="mt-2 text-xs text-[color:var(--warning)]">
+      {idleBeds} plot{idleBeds === 1 ? '' : 's'} left empty: you do not own enough seeds
+      to fill them. One seed can only grow in one plot at a time.
+    </p>
+  ) : null
+}
+
+function renderLegend(hasAnimals: boolean, ideal: boolean) {
+  return (
+    <ul className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-faint">
+      {RARITY_ORDER.map((rarity) => (
+        <li key={rarity} className="flex items-center gap-1.5">
+          <span
+            aria-hidden="true"
+            className="size-2.5 rounded-sm border-2"
+            style={{ borderColor: RARITY_VAR.get(rarity) }}
+          />
+          {titleCase(rarity)}
+        </li>
+      ))}
+      <li className="flex items-center gap-1.5">
+        <span
+          aria-hidden="true"
+          className="size-2.5 rounded-full bg-[color:var(--warning)]"
+        />
+        {'Lamp'}
+      </li>
+      {hasAnimals ? (
+        <li className="flex items-center gap-1.5">
+          <span
+            aria-hidden="true"
+            className="size-2.5 rounded-sm bg-[color:var(--grass-2)]"
+          />
+          {'Animal'}
+        </li>
+      ) : null}
+      {ideal ? (
+        <li className="flex items-center gap-1.5">
+          <span
+            aria-hidden="true"
+            className="size-2.5 rounded-sm border-2 border-dashed border-[color:var(--text)]"
+          />
+          {'Move a lamp here'}
+        </li>
+      ) : null}
+    </ul>
   )
 }
 
@@ -533,40 +898,9 @@ export function FarmWorkspace({
   const iconByCode = useMemo(() => buildCodeIconLookup(catalogue), [catalogue])
   const feedReport = useMemo(() => buildFeedReport(inventory, catalogue), [inventory, catalogue])
 
-  // Every pen's recommended feed, so the field can draw it without redoing the work per plot.
-  const feedByPen = useMemo(() => {
-    const map = new Map<string, string>()
-    for (const animal of feedReport.animals) {
-      // Falls through to the plain best-fitting feed so a pen always has a sprite to draw:
-      // a greyed-out picture of the food says far more than an empty square with a cross.
-      const feed =
-        animal.sustainable ?? animal.best ?? animal.obtainable ?? animal.feeds[0] ?? null
-      if (feed) map.set(animal.id, feed.code)
-    }
-    return map
-  }, [feedReport])
-
-  /** Pens whose feed is not on hand: the sprite is drawn faded so the state is visible. */
-  const feedNotOwned = useMemo(
-    () =>
-      new Set(
-        feedReport.animals
-          .filter((animal) => (animal.sustainable ?? animal.best) === null)
-          .map((animal) => animal.id),
-      ),
-    [feedReport],
-  )
-
-  /** Pens with no feed at all, owned or craftable. */
-  const feedImpossible = useMemo(
-    () =>
-      new Set(
-        feedReport.animals
-          .filter((animal) => !animal.sustainable && !animal.best && !animal.obtainable)
-          .map((animal) => animal.id),
-      ),
-    [feedReport],
-  )
+  const feedByPen = useMemo(() => feedByPenOf(feedReport), [feedReport])
+  const feedNotOwned = useMemo(() => pensWithoutFeedOnHand(feedReport), [feedReport])
+  const feedImpossible = useMemo(() => pensWithNoFeed(feedReport), [feedReport])
 
   const [activeLand, setActiveLand] = useState(gardens[0]?.landId ?? 'sunny-field')
   const [selected, setSelected] = useState<string | null>(null)
@@ -577,30 +911,22 @@ export function FarmWorkspace({
   const horizonSec = horizonHours * 3600
 
   const lampPlan = useMemo(
-    () =>
-      live
-        ? planLamps(live, horizonSec, seedCatalogue, plantingMode, attendanceSec(attendance))
-        : null,
+    () => lampPlanFor(live, horizonSec, seedCatalogue, plantingMode, attendance),
     [live, horizonSec, seedCatalogue, plantingMode, attendance],
   )
 
-  const idealGarden = useMemo(
-    () => (live && lampPlan ? applyLampPlan(live, lampPlan) : null),
-    [live, lampPlan],
-  )
+  const idealGarden = useMemo(() => idealGardenFor(live, lampPlan), [live, lampPlan])
 
   const idealPlan = useMemo(
     () =>
-      idealGarden
-        ? optimize(inventoryWith(inventory, idealGarden), {
-            horizonSec,
-            ignoreStock,
-            seeds: seedCatalogue,
-            disabled,
-            mode: plantingMode,
-            checkEverySec: attendanceSec(attendance),
-          })
-        : null,
+      idealPlanFor(idealGarden, inventory, {
+        horizonSec,
+        ignoreStock,
+        seeds: seedCatalogue,
+        disabled,
+        mode: plantingMode,
+        checkEverySec: attendanceSec(attendance),
+      }),
     [
       idealGarden,
       inventory,
@@ -613,93 +939,45 @@ export function FarmWorkspace({
     ],
   )
 
-  const gain = lampPlan ? lampPlan.bestBiopoints - lampPlan.currentBiopoints : 0
-  // Whether moving a lamp is worth anything. The ideal view exists either way: even with the
-  // lamps already right, it is the one where every pen runs the best feed you can make.
-  const canImprove = gain > 1 && (lampPlan?.moved ?? 0) > 0
-
-  const ideal = showIdealLayout && Boolean(idealGarden && idealPlan)
-  const garden = ideal && idealGarden ? idealGarden : live
-
-  // In the ideal view the animals run the best feed you can actually make.
-  const animalDay = ideal ? feedReport.idealBiopointsPerDay : feedReport.biopointsPerDay
+  const { gain, canImprove } = lampGain(lampPlan)
 
   const planNow = useMemo(() => byBed(plan), [plan])
   const planIdeal = useMemo(() => byBed(idealPlan), [idealPlan])
-  const planByBed = ideal ? planIdeal : planNow
+  const { hasIdeal, ideal, garden, animalDay, planByBed } = pickView({
+    showIdealLayout,
+    live,
+    idealGarden,
+    idealPlan,
+    planNow,
+    planIdeal,
+    feedReport,
+  })
 
-  /**
-   * Only the plots that GAIN a lamp.
-   *
-   * A plot losing its lamp also "changed", but marking it the same way and labelling the
-   * marker "move a lamp here" pointed at plots the ideal deliberately leaves dark. The two
-   * are opposite instructions and cannot share a border.
-   */
-  const gainedLamp = useMemo(() => {
-    if (!live || !lampPlan) return new Set<string>()
-    return new Set(
-      live.beds
-        .filter((bed) => {
-          const next = lampPlan.assignment.get(bed.id) ?? null
-          if (next === null || next === bed.lamp) return false
-          return bed.lamp === null || RARITY_ORDER.indexOf(next) > RARITY_ORDER.indexOf(bed.lamp)
-        })
-        .map((bed) => bed.id),
-    )
-  }, [live, lampPlan])
+  const gainedLamp = useMemo(() => bedsGainingLamp(live, lampPlan), [live, lampPlan])
 
   if (!garden || !live) return null
 
-  const total = garden.beds.reduce(
-    (sum, bed) => sum + (planByBed.get(bed.id)?.biopointsPerPlot ?? 0),
-    0,
-  )
-  // Both views, always: the page never shows one number without the other beside it.
-  const nowPerDay =
-    live.beds.reduce((sum, bed) => sum + (planNow.get(bed.id)?.biopointsPerPlot ?? 0), 0) +
-    feedReport.biopointsPerDay
-  const idealPerDay =
-    idealGarden && idealPlan
-      ? idealGarden.beds.reduce(
-          (sum, bed) => sum + (planIdeal.get(bed.id)?.biopointsPerPlot ?? 0),
-          0,
-        ) + feedReport.idealBiopointsPerDay
-      : nowPerDay
-  const totalLucky = garden.beds.reduce(
-    (sum, bed) => sum + (planByBed.get(bed.id)?.biopointsLucky ?? 0),
-    0,
-  )
-  const totalPlain = garden.beds.reduce(
-    (sum, bed) => sum + (planByBed.get(bed.id)?.biopointsPlain ?? 0),
-    0,
-  )
+  const { total, nowPerDay, idealPerDay, totalLucky, totalPlain } = farmTotals({
+    garden,
+    live,
+    planByBed,
+    planNow,
+    planIdeal,
+    idealGarden,
+    idealPlan,
+    feedReport,
+  })
+  const { soil, animals, hungry, idleBeds, landName } = farmCounts(garden, planByBed)
 
-  // A plot left empty is almost always a seed shortage, not a bug, and the player can only
-  // act on it if the page says so.
-  const soil = garden.beds.filter((bed) => !bed.isAnimal)
-  const animals = garden.beds.filter((bed) => bed.isAnimal)
-  const hungry = animals.filter((bed) => !bed.plantedSeedCode).length
-  const idleBeds = soil.filter((bed) => (planByBed.get(bed.id)?.entries.length ?? 0) === 0).length
-  const landName = lands.find((land) => land.id === garden.landId)?.name ?? garden.landId
-
-  const stats: Stat[] = []
-  // Luck is the difference between a flat day and a great one.
-  if (totalLucky > totalPlain) {
-    stats.push({ label: 'lucky', value: totalLucky, exact: formatExact(totalLucky), tone: 'warning' })
-    stats.push({ label: 'flat', value: totalPlain, exact: formatExact(totalPlain) })
-  }
-  // Crops and animals are two different engines; the farm is the sum.
-  if (feedReport.hasOutput) {
-    stats.push({ label: 'from plots', value: total, exact: formatExact(total) })
-    stats.push({
-      label: `from ${animals.length} animal${animals.length === 1 ? '' : 's'}`,
-      value: animalDay,
-      exact: formatExact(animalDay),
-      tone: 'ink',
-    })
-  }
-  stats.push({ label: 'per hour', value: total / (horizonSec / 3600) })
-  stats.push({ label: 'per pool', value: total / (horizonSec / 14_400) })
+  const stats = buildStats({
+    totalLucky,
+    totalPlain,
+    total,
+    hasOutput: feedReport.hasOutput,
+    animalCount: animals.length,
+    animalDay,
+    horizonSec,
+  })
 
   return (
     <WorkspaceShell
@@ -749,35 +1027,9 @@ export function FarmWorkspace({
               }}
             />
 
-            {idealGarden && idealPlan ? (
-              <button
-                type="button"
-                role="switch"
-                aria-checked={ideal}
-                onClick={() => setShowIdealLayout(!ideal)}
-                className={`inline-flex min-h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold transition-colors duration-150 ${
-                  ideal
-                    ? 'border-[color:var(--accent)] bg-accent-dim text-accent'
-                    : 'border-line bg-surface-2 text-ink hover:border-line-strong'
-                }`}
-              >
-                <span
-                  aria-hidden="true"
-                  className={`flex size-3.5 shrink-0 items-center justify-center rounded-full border-2 ${
-                    ideal
-                      ? 'border-[color:var(--accent)] bg-accent text-[color:var(--accent-contrast)]'
-                      : 'border-line-strong'
-                  }`}
-                >
-                  {ideal ? <Check size={9} strokeWidth={3.5} /> : null}
-                </span>
-                <Lightbulb size={13} aria-hidden="true" />
-                Ideal
-                {canImprove ? (
-                  <span className="tabular font-medium opacity-80">+{formatBiopoints(gain)}</span>
-                ) : null}
-              </button>
-            ) : null}
+            {hasIdeal
+              ? renderIdealToggle(ideal, canImprove, gain, () => setShowIdealLayout(!ideal))
+              : null}
           </div>
 
           <div className="w-full rounded-2xl border border-line bg-surface p-3 shadow-[var(--shadow-2)]">
@@ -807,101 +1059,20 @@ export function FarmWorkspace({
             />
 
             <p className="mt-2 text-xs text-muted">
-              {ideal ? (
-                canImprove ? (
-                  <>
-                    Lamps shown where they should be. Dashed plots are the ones to move a lamp
-                    onto:{' '}
-                    <span className="tabular font-semibold text-accent">
-                      +{formatBiopoints(gain)}
-                    </span>{' '}
-                    bp / day. Pens run the best feed you can make. Nothing is changed in your game.
-                  </>
-                ) : (
-                  <>
-                    Your lamps are already where they should be. Pens run the best feed you can
-                    make; switch to Now for what is actually growing.
-                  </>
-                )
-              ) : canImprove ? (
-                <>
-                  Your farm as it is. Moving {lampPlan?.movedLamps ?? 0} lamp
-                  {(lampPlan?.movedLamps ?? 0) === 1 ? '' : 's'} and feeding every pen its best is
-                  worth{' '}
-                  <span className="tabular font-semibold text-accent">
-                    +{formatBiopoints(Math.max(0, idealPerDay - nowPerDay))}
-                  </span>{' '}
-                  bp / day.
-                </>
-              ) : (
-                <>Your farm as it is, with what is growing right now.</>
+              {renderLayoutNote(
+                ideal,
+                canImprove,
+                gain,
+                lampPlan,
+                Math.max(0, idealPerDay - nowPerDay),
               )}
             </p>
 
-            {hungry > 0 ? (
-              <p className="mt-2 text-xs text-[color:var(--warning)]">
-                {hungry} animal{hungry === 1 ? '' : 's'} with nothing growing
-                {feedReport.hasOutput &&
-                feedReport.idealBiopointsPerDay > feedReport.biopointsPerDay ? (
-                  <>
-                    . Feeding every pen its best would add{' '}
-                    <span className="tabular font-semibold">
-                      {formatBiopoints(
-                        feedReport.idealBiopointsPerDay - feedReport.biopointsPerDay,
-                      )}
-                    </span>{' '}
-                    bp / day.
-                  </>
-                ) : (
-                  '. Feed is crafted from your harvest; the Animals tab shows what you can make.'
-                )}
-              </p>
-            ) : null}
+            {renderHungryNote(hungry, feedReport)}
 
-            {idleBeds > 0 ? (
-              <p className="mt-2 text-xs text-[color:var(--warning)]">
-                {idleBeds} plot{idleBeds === 1 ? '' : 's'} left empty: you do not own enough seeds
-                to fill them. One seed can only grow in one plot at a time.
-              </p>
-            ) : null}
+            {renderIdleNote(idleBeds)}
 
-            <ul className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-faint">
-              {RARITY_ORDER.map((rarity) => (
-                <li key={rarity} className="flex items-center gap-1.5">
-                  <span
-                    aria-hidden="true"
-                    className="size-2.5 rounded-sm border-2"
-                    style={{ borderColor: RARITY_VAR[rarity] }}
-                  />
-                  {titleCase(rarity)}
-                </li>
-              ))}
-              <li className="flex items-center gap-1.5">
-                <span
-                  aria-hidden="true"
-                  className="size-2.5 rounded-full bg-[color:var(--warning)]"
-                />
-                Lamp
-              </li>
-              {animals.length > 0 ? (
-                <li className="flex items-center gap-1.5">
-                  <span
-                    aria-hidden="true"
-                    className="size-2.5 rounded-sm bg-[color:var(--grass-2)]"
-                  />
-                  Animal
-                </li>
-              ) : null}
-              {ideal ? (
-                <li className="flex items-center gap-1.5">
-                  <span
-                    aria-hidden="true"
-                    className="size-2.5 rounded-sm border-2 border-dashed border-[color:var(--text)]"
-                  />
-                  Move a lamp here
-                </li>
-              ) : null}
-            </ul>
+            {renderLegend(animals.length > 0, ideal)}
           </div>
         </TabPanel>
       )}

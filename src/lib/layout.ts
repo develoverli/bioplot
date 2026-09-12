@@ -150,6 +150,88 @@ function coversBed(tiles: Tile[], x: number, y: number, print: Footprint): boole
   return tiles.some((tile) => print.keys.has(`${tile.x - x},${tile.y - y}`))
 }
 
+type SoilBed = Garden['beds'][number]
+type BedValueOf = (rarity: Rarity, lamp: LampRarity | null) => number
+interface Spot {
+  x: number
+  y: number
+  gain: number
+  here: boolean
+}
+
+/** True when the bed already has a lamp at least as strong as this one. */
+function coveredByStronger(already: LampRarity | null, lamp: GardenDevice): boolean {
+  return already !== null && RARITIES.indexOf(already) >= RARITIES.indexOf(lamp.rarity)
+}
+
+/** Biopoints a lamp adds with its box's top-left at (x, y). */
+function gainAt(
+  soil: SoilBed[],
+  assignment: Map<string, LampRarity | null>,
+  lamp: GardenDevice,
+  print: Footprint,
+  x: number,
+  y: number,
+  value: BedValueOf,
+): number {
+  let gain = 0
+  for (const bed of soil) {
+    if (!coversBed(bed.tiles, x, y, print)) continue
+    const already = assignment.get(bed.id) ?? null
+    // A weaker lamp adds nothing to a bed a stronger one already covers.
+    if (coveredByStronger(already, lamp)) continue
+    gain += value(bed.rarity, lamp.rarity) - value(bed.rarity, already)
+  }
+  return gain
+}
+
+/** The position on the land where a lamp adds the most. */
+function bestSpot(
+  garden: Garden,
+  soil: SoilBed[],
+  assignment: Map<string, LampRarity | null>,
+  lamp: GardenDevice,
+  print: Footprint,
+  value: BedValueOf,
+): Spot | null {
+  let best: Spot | null = null
+
+  /*
+    Several positions often light the very same beds: a lamp wider than the beds under it can
+    sit a tile either way for the same gain. Taking the first of them moved lamps that were
+    already right, which reads as the tool asking for work worth nothing. So a tie is settled
+    in favour of where the lamp stands today.
+  */
+  const TIE = 1e-6
+  for (let y = 0; y + print.h <= garden.height; y++) {
+    for (let x = 0; x + print.w <= garden.width; x++) {
+      const gain = gainAt(soil, assignment, lamp, print, x, y, value)
+      const here = x === print.x && y === print.y
+      if (best === null || gain > best.gain + TIE || (here && gain >= best.gain - TIE)) {
+        best = { x, y, gain, here }
+      }
+    }
+  }
+  return best
+}
+
+/** Records the lamp on every bed it lights that no stronger lamp already covers. */
+function lightBeds(
+  soil: SoilBed[],
+  assignment: Map<string, LampRarity | null>,
+  lamp: GardenDevice,
+  print: Footprint,
+  x: number,
+  y: number,
+): void {
+  for (const bed of soil) {
+    if (!coversBed(bed.tiles, x, y, print)) continue
+    const already = assignment.get(bed.id) ?? null
+    if (coveredByStronger(already, lamp)) continue
+    assignment.set(bed.id, lamp.rarity)
+  }
+}
+
 export function planLamps(
   garden: Garden,
   horizonSec: number,
@@ -177,33 +259,7 @@ export function planLamps(
   for (const lamp of lamps) {
     const print = footprintOf(lamp)
     const { w, h } = print
-    let best: { x: number; y: number; gain: number; here: boolean } | null = null
-
-    /*
-      Several positions often light the very same beds: a lamp wider than the beds under it can
-      sit a tile either way for the same gain. Taking the first of them moved lamps that were
-      already right, which reads as the tool asking for work worth nothing. So a tie is settled
-      in favour of where the lamp stands today.
-    */
-    const TIE = 1e-6
-    for (let y = 0; y + h <= garden.height; y++) {
-      for (let x = 0; x + w <= garden.width; x++) {
-        let gain = 0
-        for (const bed of soil) {
-          if (!coversBed(bed.tiles, x, y, print)) continue
-          const already = assignment.get(bed.id) ?? null
-          // A weaker lamp adds nothing to a bed a stronger one already covers.
-          if (already !== null && RARITIES.indexOf(already) >= RARITIES.indexOf(lamp.rarity)) {
-            continue
-          }
-          gain += value(bed.rarity, lamp.rarity) - value(bed.rarity, already)
-        }
-        const here = x === print.x && y === print.y
-        if (best === null) best = { x, y, gain, here }
-        else if (gain > best.gain + TIE) best = { x, y, gain, here }
-        else if (here && gain >= best.gain - TIE) best = { x, y, gain, here }
-      }
-    }
+    const best = bestSpot(garden, soil, assignment, lamp, print, value)
 
     if (!best) continue
     if (!best.here) movedLamps += 1
@@ -217,12 +273,7 @@ export function planLamps(
       anchor: print.anchor,
     })
 
-    for (const bed of soil) {
-      if (!coversBed(bed.tiles, best.x, best.y, print)) continue
-      const already = assignment.get(bed.id) ?? null
-      if (already !== null && RARITIES.indexOf(already) >= RARITIES.indexOf(lamp.rarity)) continue
-      assignment.set(bed.id, lamp.rarity)
-    }
+    lightBeds(soil, assignment, lamp, print, best.x, best.y)
   }
 
   let currentBiopoints = 0

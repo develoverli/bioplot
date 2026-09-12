@@ -36,14 +36,18 @@ export function Card({
 
 type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger'
 
-const BUTTON_STYLES: Record<ButtonVariant, string> = {
-  primary:
+const BUTTON_STYLES = new Map<ButtonVariant, string>([
+  [
+    'primary',
     'border-transparent bg-accent text-[color:var(--accent-contrast)] hover:bg-accent-strong active:bg-accent-strong',
-  secondary: 'border-line bg-surface-2 text-ink hover:bg-surface-3 active:bg-surface-3',
-  ghost: 'border-transparent bg-transparent text-muted hover:bg-surface-2 hover:text-ink active:bg-surface-3',
-  danger:
+  ],
+  ['secondary', 'border-line bg-surface-2 text-ink hover:bg-surface-3 active:bg-surface-3'],
+  ['ghost', 'border-transparent bg-transparent text-muted hover:bg-surface-2 hover:text-ink active:bg-surface-3'],
+  [
+    'danger',
     'border-line bg-transparent text-[color:var(--danger)] hover:bg-surface-2 active:bg-surface-3',
-}
+  ],
+])
 
 export function Button({
   variant = 'secondary',
@@ -52,8 +56,9 @@ export function Button({
 }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: ButtonVariant }) {
   return (
     <button
+      type="button"
       {...props}
-      className={`inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition-colors duration-150 ${BUTTON_STYLES[variant]} ${className}`}
+      className={`inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition-colors duration-150 ${BUTTON_STYLES.get(variant)} ${className}`}
     />
   )
 }
@@ -66,6 +71,7 @@ export function IconButton({
 }: React.ButtonHTMLAttributes<HTMLButtonElement> & { label: string; children: ReactNode }) {
   return (
     <button
+      type="button"
       {...props}
       aria-label={label}
       title={label}
@@ -231,25 +237,25 @@ export function CheckSwitch({
   )
 }
 
-const RARITY_VAR: Record<Rarity, string> = {
-  common: 'var(--rarity-common)',
-  uncommon: 'var(--rarity-uncommon)',
-  rare: 'var(--rarity-rare)',
-  epic: 'var(--rarity-epic)',
-  legendary: 'var(--rarity-legendary)',
-}
+const RARITY_VAR = new Map<Rarity, string>([
+  ['common', 'var(--rarity-common)'],
+  ['uncommon', 'var(--rarity-uncommon)'],
+  ['rare', 'var(--rarity-rare)'],
+  ['epic', 'var(--rarity-epic)'],
+  ['legendary', 'var(--rarity-legendary)'],
+])
 
 /** Colour plus the word itself: rarity is never communicated by colour alone. */
 export function RarityBadge({ rarity, className = '' }: { rarity: Rarity; className?: string }) {
   return (
     <span
       className={`inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium ${className}`}
-      style={{ color: RARITY_VAR[rarity] }}
+      style={{ color: RARITY_VAR.get(rarity) }}
     >
       <span
         aria-hidden="true"
         className="size-1.5 rounded-full"
-        style={{ background: RARITY_VAR[rarity] }}
+        style={{ background: RARITY_VAR.get(rarity) }}
       />
       {titleCase(rarity)}
     </span>
@@ -285,16 +291,16 @@ export function Tabs<T extends string>({
 }) {
   const refs = useRef<Map<T, HTMLButtonElement>>(new Map())
 
-  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+  const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     const index = items.findIndex((item) => item.id === active)
-    let next = index
+    let next: number
     if (event.key === 'ArrowRight') next = (index + 1) % items.length
     else if (event.key === 'ArrowLeft') next = (index - 1 + items.length) % items.length
     else if (event.key === 'Home') next = 0
     else if (event.key === 'End') next = items.length - 1
     else return
     event.preventDefault()
-    const item = items[next]
+    const item = items.at(next)
     if (!item) return
     onChange(item.id)
     refs.current.get(item.id)?.focus()
@@ -304,7 +310,6 @@ export function Tabs<T extends string>({
     <div
       role="tablist"
       aria-label={label}
-      onKeyDown={onKeyDown}
       className="flex flex-wrap gap-1 rounded-xl border border-line bg-surface p-1 shadow-[var(--shadow-1)]"
     >
       {items.map((item) => {
@@ -323,6 +328,7 @@ export function Tabs<T extends string>({
             aria-controls={`panel-${item.id}`}
             tabIndex={selected ? 0 : -1}
             onClick={() => onChange(item.id)}
+            onKeyDown={onKeyDown}
             className={`inline-flex min-h-8 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium transition-colors duration-150 ${
               selected
                 ? 'bg-accent-dim text-accent'
@@ -465,8 +471,16 @@ export function Modal({
       event.preventDefault()
       onClose()
     }
+    // A click on the dialog itself, not its content, is a click on the backdrop.
+    const onBackdropClick = (event: MouseEvent) => {
+      if (event.target === dialog) onClose()
+    }
     dialog.addEventListener('cancel', onCancel)
-    return () => dialog.removeEventListener('cancel', onCancel)
+    dialog.addEventListener('click', onBackdropClick)
+    return () => {
+      dialog.removeEventListener('cancel', onCancel)
+      dialog.removeEventListener('click', onBackdropClick)
+    }
   }, [onClose])
 
   return (
@@ -475,9 +489,6 @@ export function Modal({
       className={`m-auto rounded-xl border border-line bg-surface p-0 text-ink shadow-[var(--shadow-2)] backdrop:bg-black/60 ${
         wide ? 'w-[min(72rem,calc(100vw-2rem))]' : 'w-[min(34rem,calc(100vw-2rem))]'
       }`}
-      onClick={(event) => {
-        if (event.target === ref.current) onClose()
-      }}
     >
       <header className="flex items-center justify-between gap-3 border-b border-line px-4 py-2.5">
         <h2 className="text-sm font-semibold">{title}</h2>

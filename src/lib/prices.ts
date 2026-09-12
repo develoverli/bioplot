@@ -59,22 +59,24 @@ export function loadManualPrices(): Record<string, number> {
 
 export function saveManualPrice(currency: string, usd: number | null): Record<string, number> {
   const key = currencyKey(currency) ?? currency
-  const manual = loadManualPrices()
-  if (usd === null || !Number.isFinite(usd) || usd <= 0) delete manual[key]
-  else manual[key] = usd
+  const prices = new Map(Object.entries(loadManualPrices()))
+  if (usd === null || !Number.isFinite(usd) || usd <= 0) prices.delete(key)
+  else prices.set(key, usd)
+  const manual = Object.fromEntries(prices)
   write(MANUAL_KEY, manual)
   return manual
 }
 
 export function parsePriceResponse(body: unknown, at = Date.now()): Prices | null {
   if (typeof body !== 'object' || body === null) return null
-  const usd: Record<string, number> = {}
+  const entries = new Map(Object.entries(body as Record<string, { usd?: unknown }>))
+  const usd = new Map<string, number>()
   for (const [currency, id] of Object.entries(PRICE_SOURCE.ids)) {
-    const entry = (body as Record<string, { usd?: unknown }>)[id]
+    const entry = entries.get(id)
     const value = Number(entry?.usd)
-    if (Number.isFinite(value) && value > 0) usd[currency] = value
+    if (Number.isFinite(value) && value > 0) usd.set(currency, value)
   }
-  return Object.keys(usd).length > 0 ? { usd, at, source: PRICE_SOURCE.name } : null
+  return usd.size > 0 ? { usd: Object.fromEntries(usd), at, source: PRICE_SOURCE.name } : null
 }
 
 /** Fresh prices from the source, or the cache when it is fresh enough, or null. Never throws. */
@@ -104,7 +106,7 @@ export function priceOf(
 ): number | null {
   const key = currencyKey(currency)
   if (!key) return null
-  return prices?.usd[key] ?? manual[key] ?? null
+  return new Map(Object.entries(prices?.usd ?? {})).get(key) ?? new Map(Object.entries(manual)).get(key) ?? null
 }
 
 /** A raw amount (the game's integer units) in USD, or null without a price. */

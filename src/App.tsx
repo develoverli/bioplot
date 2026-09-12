@@ -18,12 +18,86 @@ import { game, seedsData } from './lib/catalog'
 import { attendanceSec } from './lib/attendance'
 import { buildEffectiveSeeds } from './lib/effective'
 import { CONTACT_URL, EXTENSION_URL, PRIVACY_URL, TERMS_URL } from './lib/links'
-import { optimize } from './lib/optimizer'
-import { useStore } from './store'
+import { optimize, type Plan } from './lib/optimizer'
+import type { PlotGroup, Seed } from './lib/types'
+import { useStore, type ThemeChoice } from './store'
 
 type Tab = 'farm' | 'schedule' | 'ranking' | 'animals' | 'pools'
 
 const PANEL_CLASS = 'rounded-2xl border border-line bg-surface p-3.5 shadow-[var(--shadow-2)]'
+
+function applyTheme(theme: ThemeChoice) {
+  const root = document.documentElement
+  if (theme === 'system') delete root.dataset.theme
+  else root.dataset.theme = theme
+}
+
+/**
+ * The farm, then the four reference tables, as one row of tabs.
+ *
+ * Each table is something you consult, not a step you follow, so none of them earns
+ * permanent space next to the field. The counts on the labels are what make a closed tab
+ * worth opening.
+ */
+function buildTabs(hungry: number, livePools: number): TabItem<Tab>[] {
+  return [
+    { id: 'farm', label: 'Farm', icon: <LayoutGrid size={15} aria-hidden="true" /> },
+    { id: 'schedule', label: 'Schedule', icon: <Table2 size={15} aria-hidden="true" /> },
+    { id: 'ranking', label: 'Ranking', icon: <ListOrdered size={15} aria-hidden="true" /> },
+    {
+      id: 'animals',
+      label: 'Animals',
+      icon: <PawPrint size={15} aria-hidden="true" />,
+      badge: hungry > 0 ? `${hungry} hungry` : undefined,
+      badgeTone: 'warning',
+    },
+    {
+      id: 'pools',
+      label: 'Pools',
+      icon: <Coins size={15} aria-hidden="true" />,
+      badge: livePools > 0 ? `${livePools} live` : undefined,
+      badgeTone: 'neutral',
+    },
+  ]
+}
+
+function renderPanel(tab: Tab, plan: Plan, horizonSec: number, catalogue: Seed[]) {
+  switch (tab) {
+    case 'schedule':
+      return (
+        <TabPanel id="schedule" className={PANEL_CLASS}>
+          <PlanPanel plan={plan} bare />
+        </TabPanel>
+      )
+    case 'ranking':
+      return (
+        <TabPanel id="ranking" className={PANEL_CLASS}>
+          <RankingPanel horizonSec={horizonSec} catalogue={catalogue} bare />
+        </TabPanel>
+      )
+    case 'animals':
+      return (
+        <TabPanel id="animals" className={PANEL_CLASS}>
+          <FeedPanel bare />
+        </TabPanel>
+      )
+    case 'pools':
+      return (
+        <TabPanel id="pools" className={PANEL_CLASS}>
+          <PoolsPanel bare />
+        </TabPanel>
+      )
+    default:
+      return null
+  }
+}
+
+function countManualPlots(plots: PlotGroup[]) {
+  return {
+    plots: plots.reduce((sum, group) => sum + group.count, 0),
+    lamps: plots.reduce((sum, group) => sum + (group.lamp ? group.count : 0), 0),
+  }
+}
 
 export default function App() {
   const theme = useStore((state) => state.theme)
@@ -36,9 +110,7 @@ export default function App() {
   const [planByHand, setPlanByHand] = useState(false)
 
   useEffect(() => {
-    const root = document.documentElement
-    if (theme === 'system') root.removeAttribute('data-theme')
-    else root.setAttribute('data-theme', theme)
+    applyTheme(theme)
   }, [theme])
 
   const catalogue = useStore((state) => state.catalogue)
@@ -83,54 +155,12 @@ export default function App() {
   )
   const livePools = inventory.pools.blocks.length
 
-  /**
-   * The farm, then the four reference tables, as one row of tabs.
-   *
-   * Each table is something you consult, not a step you follow, so none of them earns
-   * permanent space next to the field. The counts on the labels are what make a closed tab
-   * worth opening.
-   */
-  const tabs: TabItem<Tab>[] = [
-    { id: 'farm', label: 'Farm', icon: <LayoutGrid size={15} aria-hidden="true" /> },
-    { id: 'schedule', label: 'Schedule', icon: <Table2 size={15} aria-hidden="true" /> },
-    { id: 'ranking', label: 'Ranking', icon: <ListOrdered size={15} aria-hidden="true" /> },
-    {
-      id: 'animals',
-      label: 'Animals',
-      icon: <PawPrint size={15} aria-hidden="true" />,
-      badge: hungry > 0 ? `${hungry} hungry` : undefined,
-      badgeTone: 'warning',
-    },
-    {
-      id: 'pools',
-      label: 'Pools',
-      icon: <Coins size={15} aria-hidden="true" />,
-      badge: livePools > 0 ? `${livePools} live` : undefined,
-      badgeTone: 'neutral',
-    },
-  ]
+  const tabs = buildTabs(hungry, livePools)
 
   const toolbar = <Tabs items={tabs} active={tab} onChange={setTab} label="Workspace" />
 
   // Everything but the farm itself renders the same way, with or without a farm loaded.
-  const panel =
-    tab === 'schedule' ? (
-      <TabPanel id="schedule" className={PANEL_CLASS}>
-        <PlanPanel plan={plan} bare />
-      </TabPanel>
-    ) : tab === 'ranking' ? (
-      <TabPanel id="ranking" className={PANEL_CLASS}>
-        <RankingPanel horizonSec={horizonSec} catalogue={effective.seeds} bare />
-      </TabPanel>
-    ) : tab === 'animals' ? (
-      <TabPanel id="animals" className={PANEL_CLASS}>
-        <FeedPanel bare />
-      </TabPanel>
-    ) : tab === 'pools' ? (
-      <TabPanel id="pools" className={PANEL_CLASS}>
-        <PoolsPanel bare />
-      </TabPanel>
-    ) : null
+  const panel = renderPanel(tab, plan, horizonSec, effective.seeds)
 
   const sidebar = (
     <>
@@ -141,12 +171,10 @@ export default function App() {
 
   // Manual plot groups only count once the player has opened the editor: before that, the
   // starter groups are a template, not a farm, and summarising them invents a number.
-  const manualPlots = planByHand
-    ? inventory.plots.reduce((sum, group) => sum + group.count, 0)
-    : 0
-  const manualLamps = planByHand
-    ? inventory.plots.reduce((sum, group) => sum + (group.lamp ? group.count : 0), 0)
-    : 0
+  const { plots: manualPlots, lamps: manualLamps } = planByHand
+    ? countManualPlots(inventory.plots)
+    : { plots: 0, lamps: 0 }
+  const manualBiopoints = planByHand && manualPlots > 0 ? plan.totalBiopoints : null
 
   return (
     <div className="min-h-dvh bg-bg">
@@ -202,7 +230,7 @@ export default function App() {
                   plots={manualPlots}
                   animals={0}
                   lamps={manualLamps}
-                  biopointsPerDay={planByHand && manualPlots > 0 ? plan.totalBiopoints : null}
+                  biopointsPerDay={manualBiopoints}
                   liveNumbers={liveNumbers}
                   horizonHours={horizonHours}
                   onOpenSetup={() => setSetupOpen(true)}
@@ -240,7 +268,7 @@ export default function App() {
                 <strong className="text-muted">
                   {effective.liveVariants} of {effective.liveVariants + effective.docVariants}
                 </strong>{' '}
-                seed variants use the game's own live numbers; the rest fall back to the docs
+                seed variants use the game&apos;s own live numbers; the rest fall back to the docs
                 extracted on {seedsData.extractedAt}.
               </>
             ) : (
@@ -250,7 +278,7 @@ export default function App() {
                 Sync the extension to plan on live numbers.
               </>
             )}{' '}
-            Seed art comes from the game's own CDN.
+            Seed art comes from the game&apos;s own CDN.
           </p>
           <p className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <a href={PRIVACY_URL} target="_blank" rel="noreferrer noopener">

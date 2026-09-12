@@ -1,8 +1,19 @@
 import { AlertTriangle } from 'lucide-react'
 import { getLand } from '../lib/catalog'
 import { formatBiopoints, formatDuration, formatExact, titleCase } from '../lib/format'
-import type { Plan } from '../lib/optimizer'
+import type { Plan, PlotPlan } from '../lib/optimizer'
 import { BareFrame, Card, EmptyState, RarityBadge } from './ui'
+
+/** Rows are merged by group and schedule, so the two together name a row. */
+function plotPlanKey(plotPlan: PlotPlan): string {
+  return [
+    plotPlan.groupId,
+    plotPlan.plotRarity,
+    plotPlan.landId,
+    plotPlan.lamp ?? 'none',
+    ...plotPlan.entries.map((entry) => `${entry.seedId}:${entry.rarity}:${entry.plantings}`),
+  ].join('|')
+}
 
 export function PlanPanel({ plan, bare = false }: { plan: Plan; bare?: boolean }) {
   const hours = plan.horizonSec / 3600
@@ -35,8 +46,8 @@ export function PlanPanel({ plan, bare = false }: { plan: Plan; bare?: boolean }
         />
       ) : (
         <div className="flex flex-col divide-y divide-[color:var(--border)]">
-          {plan.plots.map((plotPlan, index) => (
-            <article key={`${plotPlan.groupId}-${index}`} className="py-4 first:pt-0 last:pb-0">
+          {plan.plots.map((plotPlan) => (
+            <article key={plotPlanKey(plotPlan)} className="py-4 first:pt-0 last:pb-0">
               <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                   <h3 className="text-sm font-semibold text-ink">

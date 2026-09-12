@@ -152,7 +152,7 @@ async function findVaults(closeAt) {
   const start = await blockAt(closeSeconds - 10, 'after')
   await sleep(PAUSE_MS)
 
-  const vaults = {}
+  const vaults = new Map()
   for (const [currency, token] of Object.entries(CURRENCIES)) {
     const rows = await tokenTransfers(token, start, start + PAYOUT_SPAN)
     const sent = new Map()
@@ -168,10 +168,10 @@ async function findVaults(closeAt) {
       else kept.push(vault)
       await sleep(PAUSE_MS)
     }
-    vaults[currency] = kept
+    vaults.set(currency, kept)
     await sleep(PAUSE_MS)
   }
-  return vaults
+  return Object.fromEntries(vaults)
 }
 
 /** Payout bursts finish within two minutes of the close; five minutes of chain blocks is generous. */
@@ -193,7 +193,7 @@ async function isBusy(address) {
 
 /** Everything a vault's transfer list says about its block, the funding amount included. */
 async function readVault(currency, vault) {
-  const token = CURRENCIES[currency].toLowerCase()
+  const token = new Map(Object.entries(CURRENCIES)).get(currency).toLowerCase()
   const me = vault.toLowerCase()
   const rows = await vaultTransfers(vault)
   const units = {}
@@ -231,6 +231,21 @@ async function readVault(currency, vault) {
   }
 }
 
+/** Reads a currency's candidate vaults in batches; a vault that fails is warned about and skipped. */
+async function readVaults(currency, vaults) {
+  const out = []
+  for (let i = 0; i < vaults.length; i += PARALLEL) {
+    const slice = vaults.slice(i, i + PARALLEL)
+    const results = await Promise.allSettled(slice.map((vault) => readVault(currency, vault)))
+    for (const [j, result] of results.entries()) {
+      if (result.status === 'fulfilled') out.push(result.value)
+      else console.warn(`  ${currency}: ${slice.at(j)} could not be read (${result.reason?.message ?? result.reason}); skipped`)
+    }
+    await sleep(PAUSE_MS)
+  }
+  return out
+}
+
 async function readBlock(closeAt) {
   const found = await findVaults(closeAt)
   // A block with a currency missing is not worth recording: the app would read it as "no
@@ -240,19 +255,10 @@ async function readBlock(closeAt) {
     console.warn(`  ${closeAt}: no payout burst for ${empty.join(', ')}; not recorded`)
     return null
   }
-  const pools = {}
+  const pools = new Map()
   let openAt = null
   for (const [currency, vaults] of Object.entries(found)) {
-    const out = []
-    for (let i = 0; i < vaults.length; i += PARALLEL) {
-      const slice = vaults.slice(i, i + PARALLEL)
-      const results = await Promise.allSettled(slice.map((vault) => readVault(currency, vault)))
-      for (const [j, result] of results.entries()) {
-        if (result.status === 'fulfilled') out.push(result.value)
-        else console.warn(`  ${currency}: ${slice[j]} could not be read (${result.reason?.message ?? result.reason}); skipped`)
-      }
-      await sleep(PAUSE_MS)
-    }
+    const out = await readVaults(currency, vaults)
     // A sender with no crops behind it is not a vault, whatever it paid.
     const real = out.filter((entry) => entry.contributions > 0 && entry.payout !== '0')
     if (real.length !== 4) {
@@ -260,10 +266,10 @@ async function readBlock(closeAt) {
     }
     for (const entry of real) openAt = openAt ?? entry.fundedAt
     // Largest payout first so tiers read in a stable order; fundedAt stays per vault.
-    pools[currency] = real.sort((a, b) => (BigInt(b.payout) > BigInt(a.payout) ? 1 : -1))
+    pools.set(currency, real.toSorted((a, b) => (BigInt(b.payout) > BigInt(a.payout) ? 1 : -1)))
   }
-  if (Object.values(pools).some((vaults) => vaults.length === 0)) return null
-  return { closeAt, openAt: openAt ?? new Date(Date.parse(closeAt) - BLOCK_SECONDS * 1000).toISOString(), pools }
+  if ([...pools.values()].some((vaults) => vaults.length === 0)) return null
+  return { closeAt, openAt: openAt ?? new Date(Date.parse(closeAt) - BLOCK_SECONDS * 1000).toISOString(), pools: Object.fromEntries(pools) }
 }
 
 async function loadSnapshot() {
@@ -370,7 +376,9 @@ async function flush(snapshot) {
   )
 }
 
-main().catch((error) => {
+try {
+  await main()
+} catch (error) {
   console.error(error)
   process.exitCode = 1
-})
+}

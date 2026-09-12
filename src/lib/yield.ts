@@ -49,7 +49,8 @@ export interface HarvestOutcome {
  *   harvest  = items × perItem × landMultiplier
  */
 export function harvestOutcome(seed: Seed, rarity: Rarity, ctx: PlotContext): HarvestOutcome | null {
-  const variant = seed.variants[rarity]
+  const variants = new Map(Object.entries(seed.variants))
+  const variant = variants.get(rarity)
   if (!variant) return null
   if (seed.medium !== ctx.land.medium) return null
 
@@ -64,7 +65,7 @@ export function harvestOutcome(seed: Seed, rarity: Rarity, ctx: PlotContext): Ha
   let expectedBiopointsPerItem = variant.biopoints
   if (lamp) {
     const upgraded = nextRarity(rarity)
-    const upgradedVariant = upgraded ? seed.variants[upgraded] : undefined
+    const upgradedVariant = upgraded ? variants.get(upgraded) : undefined
     // At legendary there is nothing to upgrade into, so the lamp's rarity bonus is inert.
     if (upgradedVariant) {
       expectedBiopointsPerItem =
@@ -78,7 +79,7 @@ export function harvestOutcome(seed: Seed, rarity: Rarity, ctx: PlotContext): Ha
   // The spread a player actually lives with. Criticals and lamp upgrades are dice, so the
   // expected value alone hides both how bad a quiet day looks and how good a lucky one gets.
   const upgraded = lamp ? nextRarity(rarity) : null
-  const upgradedVariant = upgraded ? seed.variants[upgraded] : undefined
+  const upgradedVariant = upgraded ? variants.get(upgraded) : undefined
   const luckyPerItem = upgradedVariant ? upgradedVariant.biopoints : variant.biopoints
 
   const biopointsPlain = plot.normalDrop * variant.biopoints * land.productionMultiplier

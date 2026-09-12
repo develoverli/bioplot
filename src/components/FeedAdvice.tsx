@@ -13,6 +13,9 @@ import { RarityBadge } from './ui'
  */
 function NeedRow({ need }: { need: FeedNeed }) {
   const short = need.owned < need.count
+  let seedTone = 'text-[color:var(--warning)]'
+  if (need.hasSeed) seedTone = 'text-accent'
+  else if (short) seedTone = 'text-[color:var(--danger)]'
   return (
     <li className="tabular flex flex-wrap items-baseline gap-x-2 text-xs">
       <span className={short ? 'text-ink' : 'text-muted'}>
@@ -22,10 +25,117 @@ function NeedRow({ need }: { need: FeedNeed }) {
         you have {need.owned}
       </span>
       {/* The seed is the supply; it is shown whether or not the bag is full today. */}
-      <span className={need.hasSeed ? 'text-accent' : short ? 'text-[color:var(--danger)]' : 'text-[color:var(--warning)]'}>
+      <span className={seedTone}>
         {need.hasSeed ? `seed owned: ${need.seed}` : `no seed: ${need.seed}`}
       </span>
     </li>
+  )
+}
+
+type Recommended = NonNullable<FarmAnimal['recommended']>
+type Nearest = FarmAnimal['nearest']
+type StockOnly = NonNullable<FarmAnimal['stockOnly']>
+
+function renderRecommended(recommended: Recommended) {
+  return (
+    <div className="flex items-start gap-2.5 rounded-lg border border-[color:var(--accent)] bg-accent-dim px-2.5 py-2">
+      {recommended.image ? (
+        <img src={recommended.image} alt="" width={32} height={32} className="size-8 shrink-0" />
+      ) : (
+        <Sprout size={18} aria-hidden="true" className="mt-1 shrink-0 text-accent" />
+      )}
+      <div className="min-w-0 flex-1">
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm font-semibold text-ink">
+          Give {recommended.name}
+          <RarityBadge rarity={recommended.rarity} />
+        </p>
+        <p className="mt-0.5 text-xs text-muted">
+          {recommended.sustainable
+            ? 'You own the seed for every ingredient, so this never runs out.'
+            : `You can craft ${recommended.craftable} now from the harvest you hold, but not again: no seed for ${recommended.cannotGrow.join(' or ')}.`}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function renderNoFeed(nearest: Nearest) {
+  return (
+    <div
+      role="alert"
+      className="flex items-start gap-2.5 rounded-lg border border-[color:var(--danger)]/60 bg-[color:var(--danger)]/10 px-2.5 py-2"
+    >
+      {nearest?.feed.image ? (
+        <img
+          src={nearest.feed.image}
+          alt=""
+          width={32}
+          height={32}
+          className="size-8 shrink-0"
+          style={{ filter: 'grayscale(1)', opacity: 0.6 }}
+        />
+      ) : (
+        <CircleAlert size={18} aria-hidden="true" className="mt-1 shrink-0 text-[color:var(--danger)]" />
+      )}
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold text-ink">No feed you can make for this pen</p>
+        {nearest ? (
+          <>
+            <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted">
+              Closest: <span className="font-medium text-ink">{nearest.feed.name}</span>
+              <RarityBadge rarity={nearest.feed.rarity} />
+            </p>
+            <ul className="mt-1 flex flex-col gap-0.5">
+              {nearest.short.map((need) => (
+                <NeedRow key={need.code} need={need} />
+              ))}
+            </ul>
+            <p className="mt-1 text-xs text-faint">
+              {nearest.short.every((need) => need.hasSeed)
+                ? 'You own every seed: grow them and this feed is yours for good.'
+                : `Buy ${nearest.short
+                    .filter((need) => !need.hasSeed)
+                    .map((need) => need.seed)
+                    .join(' and ')} and it never runs out.`}
+            </p>
+          </>
+        ) : (
+          <p className="mt-0.5 text-xs text-muted">
+            The recipes are not in the capture. Reload the farm page in chainers.io, then sync.
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function renderStockOnly(stockOnly: StockOnly, recommended: FarmAnimal['recommended']) {
+  return (
+    <div className="flex items-start gap-2.5 rounded-lg border border-[color:var(--warning)]/60 bg-[color:var(--warning)]/10 px-2.5 py-2">
+      <TriangleAlert size={16} aria-hidden="true" className="mt-0.5 shrink-0 text-[color:var(--warning)]" />
+      <div className="min-w-0 flex-1">
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs font-semibold text-ink">
+          You hold {stockOnly.owned}× {stockOnly.name}
+          <RarityBadge rarity={stockOnly.rarity} />
+          <span className="font-normal text-muted">but cannot make more</span>
+        </p>
+        {stockOnly.needs.length > 0 ? (
+          <ul className="mt-1 flex flex-col gap-0.5">
+            {stockOnly.needs
+              .filter((need) => need.owned < need.count || !need.hasSeed)
+              .map((need) => (
+                <NeedRow key={need.code} need={need} />
+              ))}
+          </ul>
+        ) : (
+          <p className="mt-0.5 text-xs text-faint">Its recipe is not in the capture.</p>
+        )}
+        <p className="mt-1 text-xs text-faint">
+          Use it while it lasts; the plan counts on {recommended ? recommended.name : 'nothing'} after
+          that.
+        </p>
+      </div>
+    </div>
   )
 }
 
@@ -43,100 +153,9 @@ export function FeedAdvice({ animal }: { animal: FarmAnimal }) {
 
   return (
     <div className="mt-2 flex flex-col gap-2">
-      {recommended ? (
-        <div className="flex items-start gap-2.5 rounded-lg border border-[color:var(--accent)] bg-accent-dim px-2.5 py-2">
-          {recommended.image ? (
-            <img src={recommended.image} alt="" width={32} height={32} className="size-8 shrink-0" />
-          ) : (
-            <Sprout size={18} aria-hidden="true" className="mt-1 shrink-0 text-accent" />
-          )}
-          <div className="min-w-0 flex-1">
-            <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm font-semibold text-ink">
-              Give {recommended.name}
-              <RarityBadge rarity={recommended.rarity} />
-            </p>
-            <p className="mt-0.5 text-xs text-muted">
-              {recommended.sustainable
-                ? 'You own the seed for every ingredient, so this never runs out.'
-                : `You can craft ${recommended.craftable} now from the harvest you hold, but not again: no seed for ${recommended.cannotGrow.join(' or ')}.`}
-            </p>
-          </div>
-        </div>
-      ) : (
-        <div
-          role="alert"
-          className="flex items-start gap-2.5 rounded-lg border border-[color:var(--danger)]/60 bg-[color:var(--danger)]/10 px-2.5 py-2"
-        >
-          {nearest?.feed.image ? (
-            <img
-              src={nearest.feed.image}
-              alt=""
-              width={32}
-              height={32}
-              className="size-8 shrink-0"
-              style={{ filter: 'grayscale(1)', opacity: 0.6 }}
-            />
-          ) : (
-            <CircleAlert size={18} aria-hidden="true" className="mt-1 shrink-0 text-[color:var(--danger)]" />
-          )}
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-ink">No feed you can make for this pen</p>
-            {nearest ? (
-              <>
-                <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted">
-                  Closest: <span className="font-medium text-ink">{nearest.feed.name}</span>
-                  <RarityBadge rarity={nearest.feed.rarity} />
-                </p>
-                <ul className="mt-1 flex flex-col gap-0.5">
-                  {nearest.short.map((need) => (
-                    <NeedRow key={need.code} need={need} />
-                  ))}
-                </ul>
-                <p className="mt-1 text-xs text-faint">
-                  {nearest.short.every((need) => need.hasSeed)
-                    ? 'You own every seed: grow them and this feed is yours for good.'
-                    : `Buy ${nearest.short
-                        .filter((need) => !need.hasSeed)
-                        .map((need) => need.seed)
-                        .join(' and ')} and it never runs out.`}
-                </p>
-              </>
-            ) : (
-              <p className="mt-0.5 text-xs text-muted">
-                The recipes are not in the capture. Reload the farm page in chainers.io, then sync.
-              </p>
-            )}
-          </div>
-        </div>
-      )}
+      {recommended ? renderRecommended(recommended) : renderNoFeed(nearest)}
 
-      {stockOnly && (!recommended || stockOnly.code !== recommended.code) ? (
-        <div className="flex items-start gap-2.5 rounded-lg border border-[color:var(--warning)]/60 bg-[color:var(--warning)]/10 px-2.5 py-2">
-          <TriangleAlert size={16} aria-hidden="true" className="mt-0.5 shrink-0 text-[color:var(--warning)]" />
-          <div className="min-w-0 flex-1">
-            <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs font-semibold text-ink">
-              You hold {stockOnly.owned}× {stockOnly.name}
-              <RarityBadge rarity={stockOnly.rarity} />
-              <span className="font-normal text-muted">but cannot make more</span>
-            </p>
-            {stockOnly.needs.length > 0 ? (
-              <ul className="mt-1 flex flex-col gap-0.5">
-                {stockOnly.needs
-                  .filter((need) => need.owned < need.count || !need.hasSeed)
-                  .map((need) => (
-                    <NeedRow key={need.code} need={need} />
-                  ))}
-              </ul>
-            ) : (
-              <p className="mt-0.5 text-xs text-faint">Its recipe is not in the capture.</p>
-            )}
-            <p className="mt-1 text-xs text-faint">
-              Use it while it lasts; the plan counts on {recommended ? recommended.name : 'nothing'} after
-              that.
-            </p>
-          </div>
-        </div>
-      ) : null}
+      {stockOnly && (!recommended || stockOnly.code !== recommended.code) ? renderStockOnly(stockOnly, recommended) : null}
     </div>
   )
 }

@@ -12,14 +12,14 @@
   /** See content-game.js: a reloaded extension orphans the scripts in open tabs. */
   const alive = () => {
     try {
-      return Boolean(chrome.runtime?.id)
+      return Boolean(globalThis.chrome.runtime?.id)
     } catch {
       return false
     }
   }
 
   if (!alive()) return
-  const VERSION = chrome.runtime.getManifest().version
+  const VERSION = globalThis.chrome.runtime.getManifest().version
 
   const reply = (message) => window.postMessage({ source: EXTENSION_SOURCE, ...message }, window.location.origin)
 
@@ -30,6 +30,7 @@
     event.data.source === APP_SOURCE
 
   window.addEventListener('message', (event) => {
+    if (event.origin !== window.location.origin) return
     if (!isAppMessage(event)) return
     if (!alive()) {
       reply({ type: 'ERROR', message: 'The extension was reloaded. Reload this page and try again.' })
@@ -44,7 +45,7 @@
     if (event.data.type !== 'REQUEST_INVENTORY') return
 
     // The service worker owns the store, so it is the one asked.
-    chrome.runtime.sendMessage({ type: 'get' }, (response) => {
+    globalThis.chrome.runtime.sendMessage({ type: 'get' }, (response) => {
       const captures = Array.isArray(response?.captures) ? response.captures : []
       if (captures.length === 0) {
         reply({

@@ -36,7 +36,16 @@ DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 def load_corpus(path: str | None) -> str:
     if path:
         return Path(path).read_text(encoding="utf-8")
-    with urllib.request.urlopen(CORPUS_URL, timeout=60) as response:
+    # An opener with only HTTPS handlers, so a file: or custom scheme can never be opened.
+    opener = urllib.request.OpenerDirector()
+    for handler in (
+        urllib.request.HTTPSHandler(),
+        urllib.request.HTTPRedirectHandler(),
+        urllib.request.HTTPDefaultErrorHandler(),
+        urllib.request.HTTPErrorProcessor(),
+    ):
+        opener.add_handler(handler)
+    with opener.open(CORPUS_URL, timeout=60) as response:
         return response.read().decode("utf-8")
 
 
@@ -107,37 +116,46 @@ def extract_seeds(corpus: str) -> dict:
     return {"source": SEEDS_DOC, "seeds": ordered}
 
 
+def line_rows(line: str) -> list[list[str]]:
+    """Table rows on one line, HTML or Markdown pipe syntax; empty when it is not a table row."""
+    if "<tr>" in line:
+        return html_rows(line)
+    if line.count("|") >= 3 and set(line.strip()) - set("|- "):
+        return [[clean(c) for c in line.strip().strip("|").split("|")]]
+    return []
+
+
+def animal_products(rows: list[list[str]]) -> list[dict]:
+    products: list[dict] = []
+    for cells in rows:
+        if len(cells) < 4:
+            continue
+        biopoints, growth = number(cells[-2]), number(cells[-1])
+        if biopoints is None or growth is None:
+            continue
+        products.append(
+            {"name": cells[0], "biopoints": biopoints, "growthSec": growth}
+        )
+    return products
+
+
 def extract_animals(corpus: str) -> dict:
     text = section(corpus, "Animals", "Seeds")
     groups: list[dict] = []
     current: dict | None = None
 
     for line in text.replace("&#x20;", " ").split("\n"):
-        heading = re.match(r"^#{2,6}\s*\*{0,2}(.+?)\*{0,2}\s*$", line.strip())
+        heading = re.match(r"^#{2,6}\s*(\S.*)$", line.strip())
         if heading:
-            title = re.sub(r"\s+", " ", heading.group(1)).strip()
+            title = re.sub(r"^\*{1,2}|\*{1,2}$", "", heading.group(1))
+            title = re.sub(r"\s+", " ", title).strip()
             current = {"group": title, "products": []}
             groups.append(current)
             continue
         if current is None:
             continue
 
-        if "<tr>" in line:
-            rows = html_rows(line)
-        elif line.count("|") >= 3 and set(line.strip()) - set("|- "):
-            rows = [[clean(c) for c in line.strip().strip("|").split("|")]]
-        else:
-            continue
-
-        for cells in rows:
-            if len(cells) < 4:
-                continue
-            biopoints, growth = number(cells[-2]), number(cells[-1])
-            if biopoints is None or growth is None:
-                continue
-            current["products"].append(
-                {"name": cells[0], "biopoints": biopoints, "growthSec": growth}
-            )
+        current["products"].extend(animal_products(line_rows(line)))
 
     return {
         "source": ANIMALS_DOC,

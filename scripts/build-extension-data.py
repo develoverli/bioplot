@@ -26,7 +26,7 @@ def main() -> None:
 
     lookup: dict[str, str] = {}
     for seed in seeds:
-        for alias in (seed["name"], seed["id"], re.sub(r"\s*seeds?$", "", seed["name"], flags=re.I)):
+        for alias in (seed["name"], seed["id"], re.sub(r"seeds?$", "", seed["name"], flags=re.I).rstrip()):
             key = normalise(alias)
             if key:
                 lookup.setdefault(key, seed["id"])

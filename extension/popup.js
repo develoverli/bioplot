@@ -63,8 +63,10 @@ function render() {
   el('state').className = state.tone
   el('stateText').textContent = state.text
   el('hint').textContent = state.hint
-  el('dot').style.background =
-    state.tone === 'ok' ? 'var(--accent)' : state.tone === 'warn' ? 'var(--warn)' : 'var(--bad)'
+  let dotColour = 'var(--bad)'
+  if (state.tone === 'ok') dotColour = 'var(--accent)'
+  else if (state.tone === 'warn') dotColour = 'var(--warn)'
+  el('dot').style.background = dotColour
 
   const beds = (payload?.gardens ?? []).flatMap((garden) => garden.beds ?? [])
   el('seeds').textContent = payload ? String(payload.seeds.length) : '0'
@@ -98,7 +100,7 @@ function copyCapture() {
 }
 
 function load() {
-  chrome.runtime.sendMessage({ type: 'get' }, (response) => {
+  globalThis.chrome.runtime.sendMessage({ type: 'get' }, (response) => {
     captures = Array.isArray(response?.captures) ? response.captures : []
     seen = response?.seen && typeof response.seen === 'object' ? response.seen : {}
     payload = captures.length ? globalThis.BioplotParse.toPayload(captures) : null
@@ -109,7 +111,7 @@ function load() {
 load()
 
 el('primary').addEventListener('click', () => {
-  if (site) chrome.tabs.create({ url: site })
+  if (site) globalThis.chrome.tabs.create({ url: site })
 })
 
 el('copy').addEventListener('click', copyCapture)
@@ -123,7 +125,7 @@ el('copyRaw').addEventListener('click', () => {
 })
 
 el('clear').addEventListener('click', () => {
-  chrome.runtime.sendMessage({ type: 'clear' }, () => {
+  globalThis.chrome.runtime.sendMessage({ type: 'clear' }, () => {
     captures = []
     seen = {}
     payload = null
@@ -141,4 +143,4 @@ if (site) {
   el('termsLink').hidden = false
 }
 
-el('version').textContent = `v${chrome.runtime.getManifest().version}`
+el('version').textContent = `v${globalThis.chrome.runtime.getManifest().version}`

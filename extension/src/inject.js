@@ -62,7 +62,7 @@
     if (typeof body !== 'string' || body.length === 0 || body.length > MAX_BODY) return
     const trimmed = body.trimStart()
     // Only structured payloads are useful; HTML and images are noise.
-    if (trimmed[0] !== '{' && trimmed[0] !== '[') return
+    if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) return
     window.postMessage({ channel: CHANNEL, url, body, at: Date.now() }, window.location.origin)
   }
 
@@ -117,9 +117,10 @@
     }
 
     PatchedWebSocket.prototype = OriginalWebSocket.prototype
-    for (const key of ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED']) {
-      PatchedWebSocket[key] = OriginalWebSocket[key]
-    }
+    PatchedWebSocket.CONNECTING = OriginalWebSocket.CONNECTING
+    PatchedWebSocket.OPEN = OriginalWebSocket.OPEN
+    PatchedWebSocket.CLOSING = OriginalWebSocket.CLOSING
+    PatchedWebSocket.CLOSED = OriginalWebSocket.CLOSED
     window.WebSocket = PatchedWebSocket
   }
 

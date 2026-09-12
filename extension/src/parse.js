@@ -18,14 +18,25 @@
   const normalise = (value) => String(value).toLowerCase().replace(/[^a-z0-9]+/g, '')
 
   const pick = (row, keys) => {
+    const fields = new Map(Object.entries(row))
     for (const key of keys) {
-      if (row[key] !== undefined && row[key] !== null) return row[key]
+      const value = fields.get(key)
+      if (value !== undefined && value !== null) return value
     }
-    for (const key of Object.keys(row)) {
+    for (const [key, value] of fields) {
       const lower = key.toLowerCase()
-      if (keys.some((candidate) => lower === candidate.toLowerCase())) return row[key]
+      if (keys.some((candidate) => lower === candidate.toLowerCase())) return value
     }
     return undefined
+  }
+
+  /** True when `word` appears in `text` with no a-z letter directly on either side. */
+  const containsWord = (text, word) => {
+    const isLetter = (char) => char >= 'a' && char <= 'z'
+    for (let at = text.indexOf(word); at !== -1; at = text.indexOf(word, at + 1)) {
+      if (!isLetter(text.charAt(at - 1)) && !isLetter(text.charAt(at + word.length))) return true
+    }
+    return false
   }
 
   const readRarity = (value) => {
@@ -43,7 +54,7 @@
     // too low: wrong feed recipes, wrong plot bonuses, wrong plans.
     return [...RARITIES]
       .sort((a, b) => b.length - a.length)
-      .find((rarity) => new RegExp(`(^|[^a-z])${rarity}([^a-z]|$)`).test(text))
+      .find((rarity) => containsWord(text, rarity))
   }
 
   const readCount = (value) => {
@@ -52,9 +63,9 @@
   }
 
   const seedIdFor = (name) => {
-    const table = globalThis.BIOPLOT_SEED_IDS ?? {}
+    const table = new Map(Object.entries(globalThis.BIOPLOT_SEED_IDS ?? {}))
     const key = normalise(name)
-    return table[key] ?? table[key.replace(/seeds?$/, '')]
+    return table.get(key) ?? table.get(key.replace(/seeds?$/, ''))
   }
 
   const looksLikePlot = (text) => /(^|[^a-z])(plot|bed|garden)/i.test(text)
@@ -66,8 +77,7 @@
    * *string*, not an object. Walking such a payload without expanding it finds nothing, so
    * every JSON-looking string is parsed back into structure before anything else runs.
    */
-  function expand(node, depth) {
-    const level = depth ?? 0
+  function expand(node, level = 0) {
     if (level > MAX_EXPAND_DEPTH) return node
 
     if (typeof node === 'string') {
@@ -83,9 +93,9 @@
     if (Array.isArray(node)) return node.map((item) => expand(item, level + 1))
 
     if (node !== null && typeof node === 'object') {
-      const out = {}
-      for (const [key, value] of Object.entries(node)) out[key] = expand(value, level + 1)
-      return out
+      return Object.fromEntries(
+        Object.entries(node).map(([key, value]) => [key, expand(value, level + 1)]),
+      )
     }
 
     return node
@@ -113,6 +123,17 @@
     return null
   }
 
+  const isObject = (value) => value !== null && typeof value === 'object'
+
+  /** Files a classified row into the seed or plot list it belongs to. */
+  function fileRow(row, seeds, plots) {
+    if (row?.kind === 'seed') {
+      seeds.push({ seedId: row.seedId, name: row.name, rarity: row.rarity, count: row.count })
+    } else if (row?.kind === 'plot') {
+      plots.push({ rarity: row.rarity, count: row.count })
+    }
+  }
+
   /** Walks any JSON value and collects everything that classifies. */
   function collect(rawPayload) {
     const payload = expand(rawPayload)
@@ -124,23 +145,16 @@
     while (queue.length > 0 && visited < MAX_NODES) {
       const node = queue.shift()
       visited += 1
-      if (node === null || typeof node !== 'object') continue
+      if (!isObject(node)) continue
 
       if (Array.isArray(node)) {
         for (const child of node) queue.push(child)
         continue
       }
 
-      const row = classify(node)
-      if (row?.kind === 'seed') {
-        seeds.push({ seedId: row.seedId, name: row.name, rarity: row.rarity, count: row.count })
-      } else if (row?.kind === 'plot') {
-        plots.push({ rarity: row.rarity, count: row.count })
-      }
+      fileRow(classify(node), seeds, plots)
 
-      for (const value of Object.values(node)) {
-        if (value !== null && typeof value === 'object') queue.push(value)
-      }
+      for (const value of Object.values(node).filter(isObject)) queue.push(value)
     }
 
     return { seeds, plots }
@@ -190,6 +204,19 @@
    * devices all matter for feeding and crafting, and guessing which ones to drop here would
    * mean re-capturing later.
    */
+  /** One active, non-empty inventory row with its code split, or null when it is skipped. */
+  function inventoryRow(item) {
+    if (item?.inventoryType && item.inventoryType !== 'active') return null
+
+    const count = readCount(item?.count) ?? 0
+    if (count <= 0) return null
+
+    const itemType = typeof item?.itemType === 'string' ? item.itemType : ''
+    const code = typeof item?.itemCode === 'string' ? item.itemCode : ''
+    const { rarity, rest } = splitItemCode(code)
+    return { itemType, code, rarity, rest, count }
+  }
+
   function readInventory(payload) {
     const seeds = []
     const spareBeds = []
@@ -199,14 +226,9 @@
     if (!Array.isArray(rows)) return { seeds, spareBeds, items }
 
     for (const item of rows) {
-      if (item?.inventoryType && item.inventoryType !== 'active') continue
-
-      const count = readCount(item?.count) ?? 0
-      if (count <= 0) continue
-
-      const itemType = typeof item?.itemType === 'string' ? item.itemType : ''
-      const code = typeof item?.itemCode === 'string' ? item.itemCode : ''
-      const { rarity, rest } = splitItemCode(code)
+      const row = inventoryRow(item)
+      if (!row) continue
+      const { itemType, code, rarity, rest, count } = row
 
       items.push({ itemType, code, rarity: rarity ?? null, name: rest, count })
 
@@ -269,44 +291,52 @@
    * The seed catalogue's exact shape has not been seen yet, so field lookup is tolerant:
    * anything that looks like a growth time is accepted, and missing fields are simply absent.
    */
+  const GROWTH_KEYS = [
+    'growthTimeSeconds',
+    'growthTime',
+    'timeToGrowSeconds',
+    'growSeconds',
+    'growthSeconds',
+  ]
+
+  const catalogueRarity = (item, code) =>
+    (typeof item?.rarity?.code === 'string' ? readRarity(item.rarity.code) : undefined) ??
+    splitItemCode(code).rarity
+
+  /** The first argument that is a string, or null when none is. */
+  const firstString = (...values) => values.find((value) => typeof value === 'string') ?? null
+
+  const catalogueImage = (media) => {
+    if (typeof media?.previewImageURL === 'string') return media.previewImageURL
+    return typeof media?.cardImageURL === 'string' ? media.cardImageURL : null
+  }
+
+  /** The first positive growth-time field, rounded, or null when there is none. */
+  function catalogueGrowth(item) {
+    const fields = new Map(Object.entries(item ?? {}))
+    for (const key of GROWTH_KEYS) {
+      const value = Number(fields.get(key))
+      if (Number.isFinite(value) && value > 0) return Math.round(value)
+    }
+    return null
+  }
+
   function readCatalogue(payload) {
     const items = payload?.data?.items
     if (!Array.isArray(items)) return []
-
-    const GROWTH_KEYS = [
-      'growthTimeSeconds',
-      'growthTime',
-      'timeToGrowSeconds',
-      'growSeconds',
-      'growthSeconds',
-    ]
 
     const out = []
     for (const item of items) {
       const code = typeof item?.code === 'string' ? item.code : ''
       if (!code) continue
 
-      const rarity =
-        (typeof item?.rarity?.code === 'string' ? readRarity(item.rarity.code) : undefined) ??
-        splitItemCode(code).rarity
+      const rarity = catalogueRarity(item, code)
       if (!rarity) continue
 
       const media = item?.farmMedia ?? item?.media ?? {}
-      const image =
-        typeof media?.previewImageURL === 'string'
-          ? media.previewImageURL
-          : typeof media?.cardImageURL === 'string'
-            ? media.cardImageURL
-            : null
+      const image = catalogueImage(media)
 
-      let growthSec = null
-      for (const key of GROWTH_KEYS) {
-        const value = Number(item?.[key])
-        if (Number.isFinite(value) && value > 0) {
-          growthSec = Math.round(value)
-          break
-        }
-      }
+      const growthSec = catalogueGrowth(item)
 
       const weight = Number(item?.rewardPoolBaseWeight)
 
@@ -384,12 +414,7 @@
         groupCode: group.rewardPoolsGroupCode,
         title: String(group?.title ?? group.rewardPoolsGroupCode),
         currency: String(group?.currency ?? ''),
-        icon:
-          typeof group?.media?.tabIconURL === 'string'
-            ? group.media.tabIconURL
-            : typeof group?.media?.previewIconURL === 'string'
-              ? group.media.previewIconURL
-              : null,
+        icon: firstString(group?.media?.tabIconURL, group?.media?.previewIconURL),
         blockTimeSeconds: Number(group?.tiers?.[0]?.blockTimeSeconds) || 0,
       }))
   }
@@ -411,12 +436,7 @@
         name: [level?.title, level?.name, level?.levelName].find((v) => typeof v === 'string') ?? null,
         level: Number(level?.level) || 0,
         pointsToClaim: Number(level?.pointsToClaim) || 0,
-        icon:
-          typeof level?.media?.tirIconURL === 'string'
-            ? level.media.tirIconURL
-            : typeof level?.media?.previewIconURL === 'string'
-              ? level.media.previewIconURL
-              : null,
+        icon: firstString(level?.media?.tirIconURL, level?.media?.previewIconURL),
       }))
       .sort((a, b) => a.level - b.level)
   }
@@ -431,12 +451,7 @@
       level: Number(data?.level) || 0,
       points: Number(data?.points) || 0,
       visualMaxPoints: Number(data?.visualMaxPoints) || 0,
-      icon:
-        typeof data?.media?.tirIconURL === 'string'
-          ? data.media.tirIconURL
-          : typeof data?.media?.previewIconURL === 'string'
-            ? data.media.previewIconURL
-            : null,
+      icon: firstString(data?.media?.tirIconURL, data?.media?.previewIconURL),
     }
   }
 
@@ -475,79 +490,89 @@
    * This is what lets the app draw the farm instead of describing it. Aggregated counts are
    * derived from this by readGardens below, so the two can never disagree.
    */
-  function readGardenLayout(payload) {
-    const gardens = Array.isArray(payload?.data) ? payload.data : []
-    const out = []
+  /** A placed lamp with its tiles, or null when the device is not a lamp with a rarity. */
+  function layoutDevice(device, index, tilesOf) {
+    const { rarity, rest } = splitItemCode(device?.itemCode)
+    if (!rarity || !isLampCode(rest)) return null
+    return {
+      id: String(device?.userDevicesID ?? `${index}`),
+      code: String(device?.itemCode ?? ''),
+      rarity,
+      tiles: tilesOf(device?.placementCoordinates),
+      covered: tilesOf(device?.coveredCoordinates),
+    }
+  }
 
-    for (const garden of gardens) {
-      const beds = []
-      const devices = []
-      let maxX = 0
-      let maxY = 0
+  /** A placed bed or pen with its tiles, or null when it has no rarity or no valid tiles. */
+  function layoutBed(bed, index, tilesOf, lampFor) {
+    const { rarity, rest } = splitItemCode(bed?.itemCode)
+    if (!rarity) return null
 
-      const tilesOf = (list) =>
-        (list ?? [])
-          .filter((tile) => Number.isFinite(tile?.x) && Number.isFinite(tile?.y))
-          .map((tile) => {
-            maxX = Math.max(maxX, tile.x)
-            maxY = Math.max(maxY, tile.y)
-            return { x: tile.x, y: tile.y }
-          })
+    const tiles = tilesOf(bed?.placementCoordinates)
+    if (tiles.length === 0) return null
 
-      for (const device of garden?.placedDevices ?? []) {
-        const { rarity, rest } = splitItemCode(device?.itemCode)
-        if (!rarity || !isLampCode(rest)) continue
-        devices.push({
-          id: String(device?.userDevicesID ?? `${devices.length}`),
-          code: String(device?.itemCode ?? ''),
-          rarity,
-          tiles: tilesOf(device?.placementCoordinates),
-          covered: tilesOf(device?.coveredCoordinates),
+    const planted = bed?.plantedSeed
+    return {
+      id: String(bed?.userBedsID ?? `${index}`),
+      rarity,
+      kind: rest,
+      isAnimal: isAnimalCode(rest),
+      tiles,
+      lamp: lampFor(tiles),
+      plantedSeedCode: typeof planted?.seedCode === 'string' ? planted.seedCode : null,
+    }
+  }
+
+  function layoutGarden(garden) {
+    const beds = []
+    const devices = []
+    let maxX = 0
+    let maxY = 0
+
+    const tilesOf = (list) =>
+      (list ?? [])
+        .filter((tile) => Number.isFinite(tile?.x) && Number.isFinite(tile?.y))
+        .map((tile) => {
+          maxX = Math.max(maxX, tile.x)
+          maxY = Math.max(maxY, tile.y)
+          return { x: tile.x, y: tile.y }
         })
-      }
 
-      const lampFor = (tiles) => {
-        const keys = new Set(tiles.map((tile) => `${tile.x},${tile.y}`))
-        let best = null
-        for (const device of devices) {
-          if (!device.covered.some((tile) => keys.has(`${tile.x},${tile.y}`))) continue
-          if (best === null || RARITIES.indexOf(device.rarity) > RARITIES.indexOf(best)) {
-            best = device.rarity
-          }
-        }
-        return best
-      }
-
-      for (const bed of garden?.placedBeds ?? []) {
-        const { rarity, rest } = splitItemCode(bed?.itemCode)
-        if (!rarity) continue
-
-        const tiles = tilesOf(bed?.placementCoordinates)
-        if (tiles.length === 0) continue
-
-        const planted = bed?.plantedSeed
-        beds.push({
-          id: String(bed?.userBedsID ?? `${beds.length}`),
-          rarity,
-          kind: rest,
-          isAnimal: isAnimalCode(rest),
-          tiles,
-          lamp: lampFor(tiles),
-          plantedSeedCode: typeof planted?.seedCode === 'string' ? planted.seedCode : null,
-        })
-      }
-
-      out.push({
-        code: String(garden?.code ?? 'garden'),
-        landId: GARDEN_LANDS[garden?.code] ?? 'sunny-field',
-        width: Math.max(Number(garden?.size?.width) || 0, maxX + 1),
-        height: Math.max(Number(garden?.size?.height) || 0, maxY + 1),
-        beds,
-        devices,
-      })
+    for (const device of garden?.placedDevices ?? []) {
+      const placed = layoutDevice(device, devices.length, tilesOf)
+      if (placed) devices.push(placed)
     }
 
-    return out
+    const lampFor = (tiles) => {
+      const keys = new Set(tiles.map((tile) => `${tile.x},${tile.y}`))
+      let best = null
+      for (const device of devices) {
+        if (!device.covered.some((tile) => keys.has(`${tile.x},${tile.y}`))) continue
+        if (best === null || RARITIES.indexOf(device.rarity) > RARITIES.indexOf(best)) {
+          best = device.rarity
+        }
+      }
+      return best
+    }
+
+    for (const bed of garden?.placedBeds ?? []) {
+      const placed = layoutBed(bed, beds.length, tilesOf, lampFor)
+      if (placed) beds.push(placed)
+    }
+
+    return {
+      code: String(garden?.code ?? 'garden'),
+      landId: GARDEN_LANDS[garden?.code] ?? 'sunny-field',
+      width: Math.max(Number(garden?.size?.width) || 0, maxX + 1),
+      height: Math.max(Number(garden?.size?.height) || 0, maxY + 1),
+      beds,
+      devices,
+    }
+  }
+
+  function readGardenLayout(payload) {
+    const gardens = Array.isArray(payload?.data) ? payload.data : []
+    return gardens.map((garden) => layoutGarden(garden))
   }
 
   /**
@@ -556,6 +581,49 @@
    * A bed counts as lit when any tile it occupies falls inside a lamp's covered tiles, which
    * is what the game itself uses to decide the bonus. Where lamps overlap, the strongest wins.
    */
+  /** The garden's lamps, each with the set of "x,y" tiles it covers. */
+  function gardenLamps(garden) {
+    const lamps = []
+    for (const device of garden?.placedDevices ?? []) {
+      const { rarity, rest } = splitItemCode(device?.itemCode)
+      if (!rarity || !isLampCode(rest)) continue
+      const tiles = new Set(
+        (device?.coveredCoordinates ?? []).map((tile) => `${tile?.x},${tile?.y}`),
+      )
+      lamps.push({ rarity, tiles })
+    }
+    return lamps
+  }
+
+  /** The strongest lamp covering any of the tiles, or null when none does. */
+  function strongestLamp(tiles, lamps) {
+    let lamp = null
+    for (const candidate of lamps) {
+      if (!tiles.some((tile) => candidate.tiles.has(tile))) continue
+      if (lamp === null || RARITIES.indexOf(candidate.rarity) > RARITIES.indexOf(lamp)) {
+        lamp = candidate.rarity
+      }
+    }
+    return lamp
+  }
+
+  /** Counts the garden's soil plots by "rarity|land|lamp". */
+  function countPlotGroups(garden, landId, lamps) {
+    const groups = new Map()
+    for (const bed of garden?.placedBeds ?? []) {
+      const { rarity, rest } = splitItemCode(bed?.itemCode)
+      // Only soil grows crops; animals are planned separately, from feed.
+      if (!rarity || !isPlotCode(rest)) continue
+
+      const tiles = (bed?.placementCoordinates ?? []).map((tile) => `${tile?.x},${tile?.y}`)
+      const lamp = strongestLamp(tiles, lamps)
+
+      const key = `${rarity}|${landId}|${lamp ?? 'none'}`
+      groups.set(key, (groups.get(key) ?? 0) + 1)
+    }
+    return groups
+  }
+
   function readGardens(payload) {
     const plots = []
     const gardens = Array.isArray(payload?.data) ? payload.data : []
@@ -563,34 +631,8 @@
     for (const garden of gardens) {
       const landId = GARDEN_LANDS[garden?.code] ?? 'sunny-field'
 
-      const lamps = []
-      for (const device of garden?.placedDevices ?? []) {
-        const { rarity, rest } = splitItemCode(device?.itemCode)
-        if (!rarity || !isLampCode(rest)) continue
-        const tiles = new Set(
-          (device?.coveredCoordinates ?? []).map((tile) => `${tile?.x},${tile?.y}`),
-        )
-        lamps.push({ rarity, tiles })
-      }
-
-      const groups = new Map()
-      for (const bed of garden?.placedBeds ?? []) {
-        const { rarity, rest } = splitItemCode(bed?.itemCode)
-        // Only soil grows crops; animals are planned separately, from feed.
-        if (!rarity || !isPlotCode(rest)) continue
-
-        const tiles = (bed?.placementCoordinates ?? []).map((tile) => `${tile?.x},${tile?.y}`)
-        let lamp = null
-        for (const candidate of lamps) {
-          if (!tiles.some((tile) => candidate.tiles.has(tile))) continue
-          if (lamp === null || RARITIES.indexOf(candidate.rarity) > RARITIES.indexOf(lamp)) {
-            lamp = candidate.rarity
-          }
-        }
-
-        const key = `${rarity}|${landId}|${lamp ?? 'none'}`
-        groups.set(key, (groups.get(key) ?? 0) + 1)
-      }
+      const lamps = gardenLamps(garden)
+      const groups = countPlotGroups(garden, landId, lamps)
 
       for (const [key, count] of groups) {
         const [rarity, land, lamp] = key.split('|')
@@ -613,6 +655,58 @@
     let crafting = []
     let sawGardens = false
 
+    const addSeed = (seed) => {
+      const key = `${seed.seedId ?? normalise(seed.name)}|${seed.rarity}`
+      // A later capture replaces an earlier one: it is the fresher truth.
+      seeds.set(key, seed)
+    }
+
+    // Checked in order; the first endpoint the capture URL contains reads it.
+    const readers = [
+      ['/api/farm/user/gardens', (parsed) => {
+        plots = readGardens(parsed)
+        gardens = readGardenLayout(parsed)
+        sawGardens = plots.length > 0
+      }],
+      ['/api/farm/data/vegetables', (parsed) => {
+        catalogue.vegetables = readCatalogue(parsed)
+      }],
+      ['/api/farm/data/seeds', (parsed) => {
+        catalogue.seeds = readCatalogue(parsed)
+      }],
+      ['/api/farm/data/beds', (parsed) => {
+        catalogue.beds = readBedTypes(parsed)
+      }],
+      // Devices carry the lamp art, which beats any drawing of a lamp.
+      ['/api/farm/data/devices', (parsed) => {
+        catalogue.devices = readBedTypes(parsed)
+      }],
+      ['/api/farm/reward-pools/active-blocks-data', (parsed) => {
+        pools.blocks = readPools(parsed)
+      }],
+      ['/api/farm/reward-pools/user-blocks-payouts', (parsed) => {
+        pools.payouts = readPayouts(parsed)
+      }],
+      ['/api/farm/reward-pools/config', (parsed) => {
+        pools.groups = readPoolConfig(parsed)
+      }],
+      ['/api/farm/reward-pools/levels-config', (parsed) => {
+        pools.levels = readLevels(parsed)
+      }],
+      ['/api/farm/reward-pools/user-level-status', (parsed) => {
+        pools.level = readLevel(parsed)
+      }],
+      ['/api/main/crafting/offers', (parsed) => {
+        crafting = readCrafting(parsed)
+      }],
+      ['/api/farm/user/inventory', (parsed) => {
+        const read = readInventory(parsed)
+        for (const seed of read.seeds) addSeed(seed)
+        spareBeds = read.spareBeds
+        items = read.items
+      }],
+    ]
+
     for (const capture of [...captures].sort((a, b) => a.at - b.at)) {
       let parsed
       try {
@@ -621,75 +715,9 @@
         continue
       }
 
-      const addSeed = (seed) => {
-        const key = `${seed.seedId ?? normalise(seed.name)}|${seed.rarity}`
-        // A later capture replaces an earlier one: it is the fresher truth.
-        seeds.set(key, seed)
-      }
-
-      if (capture.url.includes('/api/farm/user/gardens')) {
-        plots = readGardens(parsed)
-        gardens = readGardenLayout(parsed)
-        sawGardens = plots.length > 0
-        continue
-      }
-
-      if (capture.url.includes('/api/farm/data/vegetables')) {
-        catalogue.vegetables = readCatalogue(parsed)
-        continue
-      }
-
-      if (capture.url.includes('/api/farm/data/seeds')) {
-        catalogue.seeds = readCatalogue(parsed)
-        continue
-      }
-
-      if (capture.url.includes('/api/farm/data/beds')) {
-        catalogue.beds = readBedTypes(parsed)
-        continue
-      }
-
-      // Devices carry the lamp art, which beats any drawing of a lamp.
-      if (capture.url.includes('/api/farm/data/devices')) {
-        catalogue.devices = readBedTypes(parsed)
-        continue
-      }
-
-      if (capture.url.includes('/api/farm/reward-pools/active-blocks-data')) {
-        pools.blocks = readPools(parsed)
-        continue
-      }
-
-      if (capture.url.includes('/api/farm/reward-pools/user-blocks-payouts')) {
-        pools.payouts = readPayouts(parsed)
-        continue
-      }
-
-      if (capture.url.includes('/api/farm/reward-pools/config')) {
-        pools.groups = readPoolConfig(parsed)
-        continue
-      }
-
-      if (capture.url.includes('/api/farm/reward-pools/levels-config')) {
-        pools.levels = readLevels(parsed)
-        continue
-      }
-
-      if (capture.url.includes('/api/farm/reward-pools/user-level-status')) {
-        pools.level = readLevel(parsed)
-        continue
-      }
-
-      if (capture.url.includes('/api/main/crafting/offers')) {
-        crafting = readCrafting(parsed)
-        continue
-      }
-
-      if (capture.url.includes('/api/farm/user/inventory')) {
-        const read = readInventory(parsed)
-        for (const seed of read.seeds) addSeed(seed)
-        spareBeds = read.spareBeds
-        items = read.items
+      const reader = readers.find(([endpoint]) => capture.url.includes(endpoint))
+      if (reader) {
+        reader[1](parsed)
         continue
       }
 
@@ -739,25 +767,22 @@
       }
     }
 
-    const sampleOf = (row) => {
-      const out = {}
-      for (const [key, value] of Object.entries(row).slice(0, MAX_KEYS)) {
-        if (value === null || typeof value !== 'object') {
-          out[key] = typeof value === 'string' && value.length > MAX_VALUE
-            ? `${value.slice(0, MAX_VALUE)}…`
-            : value
-        } else if (Array.isArray(value)) {
-          out[key] = `[array ${value.length}]`
-        } else {
-          out[key] = `{${Object.keys(value).slice(0, 8).join(',')}}`
-        }
-      }
-      return out
-    }
+    const sampleOf = (row) =>
+      Object.fromEntries(
+        Object.entries(row).slice(0, MAX_KEYS).map(([key, value]) => {
+          if (value === null || typeof value !== 'object') {
+            return [key, typeof value === 'string' && value.length > MAX_VALUE
+              ? `${value.slice(0, MAX_VALUE)}…`
+              : value]
+          }
+          if (Array.isArray(value)) return [key, `[array ${value.length}]`]
+          return [key, `{${Object.keys(value).slice(0, 8).join(',')}}`]
+        }),
+      )
 
     /** Collects small scalar values so message types and flags are visible in the report. */
     const findScalars = (node, path, out, depth) => {
-      if (Object.keys(out).length >= 30 || depth > 3 || node === null || typeof node !== 'object') {
+      if (out.size >= 30 || depth > 3 || node === null || typeof node !== 'object') {
         return
       }
       if (Array.isArray(node)) return
@@ -765,13 +790,29 @@
       for (const [key, value] of Object.entries(node)) {
         const at = path ? `${path}.${key}` : key
         if (value === null || typeof value !== 'object') {
-          out[at] = typeof value === 'string' && value.length > MAX_VALUE
+          out.set(at, typeof value === 'string' && value.length > MAX_VALUE
             ? `${value.slice(0, MAX_VALUE)}…`
-            : value
+            : value)
         } else {
           findScalars(value, at, out, depth + 1)
         }
       }
+    }
+
+    /** Records one array's row keys and a sample row, when it holds any objects. */
+    const recordArray = (node, path, found) => {
+      const objects = node.filter((item) => item !== null && typeof item === 'object')
+      if (objects.length === 0) return
+      const keys = new Set()
+      for (const item of objects.slice(0, 20)) {
+        for (const key of Object.keys(item)) keys.add(key)
+      }
+      found.push({
+        at: path || '(root)',
+        length: node.length,
+        keys: [...keys].slice(0, MAX_KEYS),
+        sample: sampleOf(objects[0]),
+      })
     }
 
     /** Finds every array-of-objects in the payload and records where it lives. */
@@ -781,19 +822,7 @@
       }
 
       if (Array.isArray(node)) {
-        const objects = node.filter((item) => item !== null && typeof item === 'object')
-        if (objects.length > 0) {
-          const keys = new Set()
-          for (const item of objects.slice(0, 20)) {
-            for (const key of Object.keys(item)) keys.add(key)
-          }
-          found.push({
-            at: path || '(root)',
-            length: node.length,
-            keys: [...keys].slice(0, MAX_KEYS),
-            sample: sampleOf(objects[0]),
-          })
-        }
+        recordArray(node, path, found)
         for (const item of node.slice(0, 3)) findArrays(item, `${path}[]`, found, depth + 1)
         return
       }
@@ -830,8 +859,9 @@
         parsed = expand(parsed)
         const arrays = []
         findArrays(parsed, '', arrays, 0)
-        const scalars = {}
-        findScalars(parsed, '', scalars, 0)
+        const found = new Map()
+        findScalars(parsed, '', found, 0)
+        const scalars = Object.fromEntries(found)
         const rows = collect(parsed)
 
         return {

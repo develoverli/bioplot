@@ -106,6 +106,34 @@ def sample(x: float, y: float) -> tuple[int, int, int] | None:
     return bar(x, y)
 
 
+def pixel(px: int, py: int, size: int) -> bytes:
+    """One RGBA pixel, averaged over its supersamples."""
+    hi = size * SUPERSAMPLE
+    total = SUPERSAMPLE * SUPERSAMPLE
+    r = g = b = 0
+    hits = 0
+
+    for sy in range(SUPERSAMPLE):
+        for sx in range(SUPERSAMPLE):
+            fx = (px * SUPERSAMPLE + sx + 0.5) / hi * 2 - 1
+            fy = (py * SUPERSAMPLE + sy + 0.5) / hi * 2 - 1
+
+            if not rounded_box(fx, fy, 0.96, 0.46):
+                continue
+
+            colour = sample(fx, fy) or BACKGROUND
+            r += colour[0]
+            g += colour[1]
+            b += colour[2]
+            hits += 1
+
+    if hits:
+        # Averaged over the covered samples only, so an edge pixel keeps its own colour
+        # and fades out through alpha rather than fading towards black.
+        return bytes((r // hits, g // hits, b // hits, round(255 * hits / total)))
+    return b"\x00\x00\x00\x00"
+
+
 def render(size: int) -> bytes:
     """Returns raw RGBA rows for one icon.
 
@@ -114,37 +142,13 @@ def render(size: int) -> bytes:
     them: a browser tab strip, a launcher, a store listing. The share of samples that landed
     inside the shape doubles as the alpha, so the rounded edge comes out smooth for free.
     """
-    hi = size * SUPERSAMPLE
-    total = SUPERSAMPLE * SUPERSAMPLE
     rows = bytearray()
 
     for py in range(size):
         # Each PNG scanline is prefixed with its filter type; 0 means "none".
         row = bytearray(b"\x00")
         for px in range(size):
-            r = g = b = 0
-            hits = 0
-
-            for sy in range(SUPERSAMPLE):
-                for sx in range(SUPERSAMPLE):
-                    fx = (px * SUPERSAMPLE + sx + 0.5) / hi * 2 - 1
-                    fy = (py * SUPERSAMPLE + sy + 0.5) / hi * 2 - 1
-
-                    if not rounded_box(fx, fy, 0.96, 0.46):
-                        continue
-
-                    colour = sample(fx, fy) or BACKGROUND
-                    r += colour[0]
-                    g += colour[1]
-                    b += colour[2]
-                    hits += 1
-
-            if hits:
-                # Averaged over the covered samples only, so an edge pixel keeps its own colour
-                # and fades out through alpha rather than fading towards black.
-                row += bytes((r // hits, g // hits, b // hits, round(255 * hits / total)))
-            else:
-                row += b"\x00\x00\x00\x00"
+            row += pixel(px, py, size)
 
         rows += row
 

@@ -6,16 +6,16 @@ import { IconButton, IconLink } from './ui'
 
 const THEME_ORDER: ThemeChoice[] = ['system', 'dark', 'light']
 
-const THEME_META: Record<ThemeChoice, { label: string; Icon: typeof Sun }> = {
-  system: { label: 'Theme: follow system', Icon: Monitor },
-  dark: { label: 'Theme: dark', Icon: Moon },
-  light: { label: 'Theme: light', Icon: Sun },
-}
+const THEME_META = new Map<ThemeChoice, { label: string; Icon: typeof Sun }>([
+  ['system', { label: 'Theme: follow system', Icon: Monitor }],
+  ['dark', { label: 'Theme: dark', Icon: Moon }],
+  ['light', { label: 'Theme: light', Icon: Sun }],
+])
 
 export function Header() {
   const theme = useStore((state) => state.theme)
   const setTheme = useStore((state) => state.setTheme)
-  const { label, Icon } = THEME_META[theme]
+  const { label, Icon } = THEME_META.get(theme)!
 
   return (
     <header className="sticky top-0 z-20 border-b border-line bg-bg/95 backdrop-blur-sm">

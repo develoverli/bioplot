@@ -218,22 +218,7 @@ function solveByVisits(
 
   // "One seed per plot" still means one seed per plot when you only visit every few hours:
   // the plot is committed to a single crop, it is simply replanted at each visit.
-  if (mode === 'single') {
-    let best: { option: Option; plantings: number } | null = null
-    for (const option of fits) {
-      const plantings = Math.min(slots, budget.get(option.key) ?? 0)
-      if (plantings <= 0) continue
-      if (!best || plantings * option.value > best.plantings * best.option.value) {
-        best = { option, plantings }
-      }
-    }
-    if (!best) return { picks: new Map(), value: 0, incomplete: false }
-    return {
-      picks: new Map([[best.option.key, best.plantings]]),
-      value: best.plantings * best.option.value,
-      incomplete: false,
-    }
-  }
+  if (mode === 'single') return solveSingleByVisits(fits, slots, budget)
 
   let value = 0
   for (let slot = 0; slot < slots; slot++) {
@@ -246,6 +231,28 @@ function solveByVisits(
   }
 
   return { picks, value, incomplete: false }
+}
+
+/** The single-seed variant of solveByVisits: the one crop that scores most over every slot. */
+function solveSingleByVisits(
+  fits: Option[],
+  slots: number,
+  budget: Map<string, number>,
+): Solution {
+  let best: { option: Option; plantings: number } | null = null
+  for (const option of fits) {
+    const plantings = Math.min(slots, budget.get(option.key) ?? 0)
+    if (plantings <= 0) continue
+    if (!best || plantings * option.value > best.plantings * best.option.value) {
+      best = { option, plantings }
+    }
+  }
+  if (!best) return { picks: new Map(), value: 0, incomplete: false }
+  return {
+    picks: new Map([[best.option.key, best.plantings]]),
+    value: best.plantings * best.option.value,
+    incomplete: false,
+  }
 }
 
 /** One seed, replanted until the window runs out. */
@@ -272,6 +279,47 @@ function solveSinglePlot(
   }
 }
 
+/** Enough to fill the plot: an ascending sweep is the cheap way to say "as many as fit". */
+function sweepUnbounded(dp: Float64Array, option: Option, buckets: number): void {
+  for (let t = option.cost; t <= buckets; t++) {
+    const candidate = dp[t - option.cost]! + option.value
+    if (candidate > dp.at(t)! + EPSILON) dp.fill(candidate, t, t + 1)
+  }
+}
+
+/** Bounded: a descending sweep uses each copy at most once. */
+function sweepBounded(dp: Float64Array, option: Option, buckets: number, allowed: number): void {
+  for (let copy = 0; copy < allowed; copy++) {
+    for (let t = buckets; t >= option.cost; t--) {
+      const candidate = dp[t - option.cost]! + option.value
+      if (candidate > dp.at(t)! + EPSILON) dp.fill(candidate, t, t + 1)
+    }
+  }
+}
+
+function bestBucket(dp: Float64Array, buckets: number): number {
+  let bestT = 0
+  for (let t = 1; t <= buckets; t++) {
+    if (dp.at(t)! > dp.at(bestT)! + EPSILON) bestT = t
+  }
+  return bestT
+}
+
+/** The first option, in density order, that still has stock and explains dp at `t`. */
+function reconstructStep(
+  options: Option[],
+  budget: Map<string, number>,
+  dp: Float64Array,
+  t: number,
+): Option | undefined {
+  for (const option of options) {
+    if (option.cost > t) continue
+    if ((budget.get(option.key) ?? 0) <= 0) continue
+    if (Math.abs(dp.at(t)! - (dp[t - option.cost]! + option.value)) < EPSILON) return option
+  }
+  return undefined
+}
+
 function solvePlot(options: Option[], buckets: number, supply: Map<string, Supply>): Solution {
   const dp = new Float64Array(buckets + 1)
   const maxFit = (option: Option) => Math.floor(buckets / option.cost)
@@ -280,28 +328,11 @@ function solvePlot(options: Option[], buckets: number, supply: Map<string, Suppl
     const allowed = plantingsAllowed(option, supply, buckets)
     if (allowed <= 0) continue
 
-    if (allowed >= maxFit(option)) {
-      // Enough to fill the plot: an ascending sweep is the cheap way to say "as many as fit".
-      for (let t = option.cost; t <= buckets; t++) {
-        const candidate = dp[t - option.cost]! + option.value
-        if (candidate > dp[t]! + EPSILON) dp[t] = candidate
-      }
-      continue
-    }
-
-    for (let copy = 0; copy < allowed; copy++) {
-      // Bounded: a descending sweep uses each copy at most once.
-      for (let t = buckets; t >= option.cost; t--) {
-        const candidate = dp[t - option.cost]! + option.value
-        if (candidate > dp[t]! + EPSILON) dp[t] = candidate
-      }
-    }
+    if (allowed >= maxFit(option)) sweepUnbounded(dp, option, buckets)
+    else sweepBounded(dp, option, buckets, allowed)
   }
 
-  let bestT = 0
-  for (let t = 1; t <= buckets; t++) {
-    if (dp[t]! > dp[bestT]! + EPSILON) bestT = t
-  }
+  const bestT = bestBucket(dp, buckets)
 
   // Walk the table back down, re-deriving each step, so the plan always matches dp.
   const picks = new Map<string, number>()
@@ -313,16 +344,8 @@ function solvePlot(options: Option[], buckets: number, supply: Map<string, Suppl
   let t = bestT
   let incomplete = false
 
-  while (t > 0 && dp[t]! > EPSILON) {
-    let chosen: Option | undefined
-    for (const option of options) {
-      if (option.cost > t) continue
-      if ((budget.get(option.key) ?? 0) <= 0) continue
-      if (Math.abs(dp[t]! - (dp[t - option.cost]! + option.value)) < EPSILON) {
-        chosen = option
-        break
-      }
-    }
+  while (t > 0 && dp.at(t)! > EPSILON) {
+    const chosen = reconstructStep(options, budget, dp, t)
 
     if (!chosen) {
       incomplete = true
@@ -334,7 +357,7 @@ function solvePlot(options: Option[], buckets: number, supply: Map<string, Suppl
     t -= chosen.cost
   }
 
-  return { picks, value: dp[bestT]!, incomplete }
+  return { picks, value: dp.at(bestT)!, incomplete }
 }
 
 function toEntries(picks: Map<string, number>, options: Option[]): PlanEntry[] {
@@ -393,6 +416,19 @@ function expandUnits(inventory: Inventory): PlotUnit[] {
 
 const UNLIMITED = Number.MAX_SAFE_INTEGER
 
+/** Every enabled variant of the catalogue, with no limit on how much of it there is. */
+function unlimitedStock(catalogue: Seed[], disabled: ReadonlySet<string>): Map<string, Supply> {
+  const stock = new Map<string, Supply>()
+  for (const seed of catalogue) {
+    for (const rarity of Object.keys(seed.variants) as Rarity[]) {
+      const key = stackKey(seed.id, rarity)
+      if (disabled.has(key)) continue
+      stock.set(key, { renewable: seed.renewable, left: UNLIMITED })
+    }
+  }
+  return stock
+}
+
 /**
  * What can actually go in the ground.
  *
@@ -408,20 +444,10 @@ function buildStock(
   disabled: ReadonlySet<string>,
   horizonSec: number,
 ): Map<string, Supply> {
-  const stock = new Map<string, Supply>()
   const unrestricted = ignoreStock || inventory.seeds.length === 0
+  if (unrestricted) return unlimitedStock(catalogue, disabled)
 
-  if (unrestricted) {
-    for (const seed of catalogue) {
-      for (const rarity of Object.keys(seed.variants) as Rarity[]) {
-        const key = stackKey(seed.id, rarity)
-        if (disabled.has(key)) continue
-        stock.set(key, { renewable: seed.renewable, left: UNLIMITED })
-      }
-    }
-    return stock
-  }
-
+  const stock = new Map<string, Supply>()
   for (const stack of inventory.seeds) {
     const seed = getSeed(stack.seedId)
     if (!seed) continue
@@ -443,6 +469,129 @@ function buildStock(
   return stock
 }
 
+interface SolveContext {
+  buckets: number
+  intervalBuckets: number
+  mode: 'mix' | 'single'
+  stock: Map<string, Supply>
+  hasScarceSeeds: boolean
+  cache: Map<string, Solution>
+}
+
+function solveWith(opts: Option[], sc: SolveContext): Solution {
+  if (sc.intervalBuckets > 0) {
+    return solveByVisits(opts, sc.buckets, sc.stock, sc.intervalBuckets, sc.mode)
+  }
+  return sc.mode === 'single'
+    ? solveSinglePlot(opts, sc.buckets, sc.stock)
+    : solvePlot(opts, sc.buckets, sc.stock)
+}
+
+/** Spend what this plot took, so the next plot sees a smaller pool. */
+function spendStock(stock: Map<string, Supply>, solution: Solution, opts: Option[]): void {
+  const lockByKey = new Map(opts.map((option) => [option.key, option.lockSec]))
+  for (const [key, used] of solution.picks) {
+    const supply = stock.get(key)
+    if (!supply || supply.left === UNLIMITED) continue
+    const spent = supply.renewable ? used * (lockByKey.get(key) ?? 0) : used
+    stock.set(key, { ...supply, left: Math.max(0, supply.left - spent) })
+  }
+}
+
+function solveUnit(unit: PlotUnit, opts: Option[], sc: SolveContext): Solution {
+  if (sc.hasScarceSeeds) {
+    const solution = solveWith(opts, sc)
+    spendStock(sc.stock, solution, opts)
+    return solution
+  }
+
+  const cached = sc.cache.get(unit.contextKey)
+  const solution = cached ?? solveWith(opts, sc)
+  if (!cached) sc.cache.set(unit.contextKey, solution)
+  return solution
+}
+
+function optionsByContextFor(
+  units: PlotUnit[],
+  bucketSec: number,
+  horizonSec: number,
+  catalogue: Seed[],
+  intervalSec: number,
+): Map<string, Option[]> {
+  const optionsByContext = new Map<string, Option[]>()
+  for (const unit of units) {
+    if (!optionsByContext.has(unit.contextKey)) {
+      optionsByContext.set(
+        unit.contextKey,
+        buildOptions(unit.ctx, bucketSec, horizonSec, catalogue, intervalSec),
+      )
+    }
+  }
+  return optionsByContext
+}
+
+/**
+ * Strongest plot first. Without scarce seeds the order does not change the totals,
+ * but it keeps the output stable and readable.
+ */
+function rankUnits(
+  units: PlotUnit[],
+  optionsByContext: Map<string, Option[]>,
+): { unit: PlotUnit; strength: number }[] {
+  return units
+    .map((unit) => {
+      const opts = optionsByContext.get(unit.contextKey) ?? []
+      let strength = 0
+      for (const option of opts) strength = Math.max(strength, option.value / option.cost)
+      return { unit, strength }
+    })
+    .sort((a, b) => b.strength - a.strength)
+}
+
+function toPlotPlan(unit: PlotUnit, solution: Solution, opts: Option[], horizonSec: number): PlotPlan {
+  const entries = toEntries(solution.picks, opts)
+  const usedSec = entries.reduce((sum, entry) => sum + entry.growthSec * entry.plantings, 0)
+  const lucky = entries.reduce((sum, entry) => sum + entry.biopointsLuckyTotal, 0)
+  const plain = entries.reduce((sum, entry) => sum + entry.biopointsPlainTotal, 0)
+
+  return {
+    groupId: unit.groupId,
+    plotRarity: unit.plotRarity,
+    landId: unit.landId,
+    lamp: unit.lamp,
+    plots: 1,
+    entries,
+    biopointsPerPlot: solution.value,
+    biopoints: solution.value,
+    biopointsLucky: lucky,
+    biopointsPlain: plain,
+    usedSec,
+    idleSec: Math.max(0, horizonSec - usedSec),
+  }
+}
+
+function pushEmptyPlotWarnings(
+  warnings: string[],
+  merged: PlotPlan[],
+  intervalBuckets: number,
+  inventory: Inventory,
+  ignoreStock: boolean,
+): void {
+  if (intervalBuckets > 0 && merged.some((plan) => plan.entries.length === 0)) {
+    warnings.push(
+      'Nothing you own ripens inside your check interval. Come back more often, or grow faster crops.',
+    )
+  }
+
+  if (merged.some((plan) => plan.entries.length === 0)) {
+    warnings.push(
+      inventory.seeds.length > 0 && !ignoreStock
+        ? 'Some plots have nothing to plant from the seeds you own. Turn on "show the ceiling" to see what they could do.'
+        : 'Some plots have nothing to plant. Check the land: water seeds only grow on water plots.',
+    )
+  }
+}
+
 /**
  * Builds the plan for the whole farm.
  *
@@ -460,10 +609,6 @@ export function optimize(inventory: Inventory, options: OptimizeOptions = {}): P
   const checkEverySec = Math.max(0, options.checkEverySec ?? 0)
   const intervalBuckets = Math.floor(checkEverySec / bucketSec)
 
-  const solve = (opts: Option[], count: number, stock: Map<string, Supply>): Solution => {
-    if (intervalBuckets > 0) return solveByVisits(opts, count, stock, intervalBuckets, mode)
-    return mode === 'single' ? solveSinglePlot(opts, count, stock) : solvePlot(opts, count, stock)
-  }
   const buckets = Math.floor(horizonSec / bucketSec)
   const warnings: string[] = []
 
@@ -489,50 +634,28 @@ export function optimize(inventory: Inventory, options: OptimizeOptions = {}): P
     (supply) => supply.left > 0 && supply.left < UNLIMITED,
   )
 
-  const optionsByContext = new Map<string, Option[]>()
-  for (const unit of units) {
-    if (!optionsByContext.has(unit.contextKey)) {
-      optionsByContext.set(
-        unit.contextKey,
-        buildOptions(unit.ctx, bucketSec, horizonSec, catalogue, intervalBuckets * bucketSec),
-      )
-    }
+  const optionsByContext = optionsByContextFor(
+    units,
+    bucketSec,
+    horizonSec,
+    catalogue,
+    intervalBuckets * bucketSec,
+  )
+  const ranked = rankUnits(units, optionsByContext)
+
+  const sc: SolveContext = {
+    buckets,
+    intervalBuckets,
+    mode,
+    stock,
+    hasScarceSeeds,
+    cache: new Map<string, Solution>(),
   }
-
-  // Strongest plot first. Without scarce seeds the order does not change the totals,
-  // but it keeps the output stable and readable.
-  const ranked = units
-    .map((unit) => {
-      const opts = optionsByContext.get(unit.contextKey) ?? []
-      let strength = 0
-      for (const option of opts) strength = Math.max(strength, option.value / option.cost)
-      return { unit, strength }
-    })
-    .sort((a, b) => b.strength - a.strength)
-
-  const solutionCache = new Map<string, Solution>()
   const plans: PlotPlan[] = []
 
   for (const { unit } of ranked) {
     const opts = optionsByContext.get(unit.contextKey) ?? []
-
-    let solution: Solution
-    if (hasScarceSeeds) {
-      solution = solve(opts, buckets, stock)
-
-      // Spend what this plot took, so the next plot sees a smaller pool.
-      const lockByKey = new Map(opts.map((option) => [option.key, option.lockSec]))
-      for (const [key, used] of solution.picks) {
-        const supply = stock.get(key)
-        if (!supply || supply.left === UNLIMITED) continue
-        const spent = supply.renewable ? used * (lockByKey.get(key) ?? 0) : used
-        stock.set(key, { ...supply, left: Math.max(0, supply.left - spent) })
-      }
-    } else {
-      const cached = solutionCache.get(unit.contextKey)
-      solution = cached ?? solve(opts, buckets, stock)
-      if (!cached) solutionCache.set(unit.contextKey, solution)
-    }
+    const solution = solveUnit(unit, opts, sc)
 
     if (solution.incomplete) {
       warnings.push(
@@ -540,25 +663,7 @@ export function optimize(inventory: Inventory, options: OptimizeOptions = {}): P
       )
     }
 
-    const entries = toEntries(solution.picks, opts)
-    const usedSec = entries.reduce((sum, entry) => sum + entry.growthSec * entry.plantings, 0)
-    const lucky = entries.reduce((sum, entry) => sum + entry.biopointsLuckyTotal, 0)
-    const plain = entries.reduce((sum, entry) => sum + entry.biopointsPlainTotal, 0)
-
-    plans.push({
-      groupId: unit.groupId,
-      plotRarity: unit.plotRarity,
-      landId: unit.landId,
-      lamp: unit.lamp,
-      plots: 1,
-      entries,
-      biopointsPerPlot: solution.value,
-      biopoints: solution.value,
-      biopointsLucky: lucky,
-      biopointsPlain: plain,
-      usedSec,
-      idleSec: Math.max(0, horizonSec - usedSec),
-    })
+    plans.push(toPlotPlan(unit, solution, opts, horizonSec))
   }
 
   const merged = mergeIdenticalPlans(plans)
@@ -566,19 +671,7 @@ export function optimize(inventory: Inventory, options: OptimizeOptions = {}): P
   const totalLucky = merged.reduce((sum, plan) => sum + plan.biopointsLucky, 0)
   const totalPlain = merged.reduce((sum, plan) => sum + plan.biopointsPlain, 0)
 
-  if (intervalBuckets > 0 && merged.some((plan) => plan.entries.length === 0)) {
-    warnings.push(
-      'Nothing you own ripens inside your check interval. Come back more often, or grow faster crops.',
-    )
-  }
-
-  if (merged.some((plan) => plan.entries.length === 0)) {
-    warnings.push(
-      inventory.seeds.length > 0 && !ignoreStock
-        ? 'Some plots have nothing to plant from the seeds you own. Turn on "show the ceiling" to see what they could do.'
-        : 'Some plots have nothing to plant. Check the land: water seeds only grow on water plots.',
-    )
-  }
+  pushEmptyPlotWarnings(warnings, merged, intervalBuckets, inventory, ignoreStock)
 
   return {
     horizonSec,

@@ -40,7 +40,7 @@ export function displayCurrency(currency: string): string {
 
 export function tokenFor(currency: string): { address: string; decimals: number } | null {
   const key = currencyKey(currency)
-  return key ? (CURRENCY_TOKENS[key] ?? null) : null
+  return key ? (new Map(Object.entries(CURRENCY_TOKENS)).get(key) ?? null) : null
 }
 
 /**
@@ -154,8 +154,10 @@ function produceKey(seedName: string): string {
   return compactKey(
     seedName
       .toLowerCase()
-      .replace(/\s*seeds?$/i, '')
-      .replace(/\s*juvenile$/i, '')
+      .replace(/seeds?$/i, '')
+      .trimEnd()
+      .replace(/juvenile$/i, '')
+      .trimEnd()
       .replace(/^juvenile\s+/i, '')
       .replace(/^new\s+/i, ''),
   )
@@ -178,19 +180,23 @@ export function buildWeightLookup(catalogue: Catalogue): WeightLookup {
   return buildWeightLookups(catalogue).byTokenName
 }
 
-export function buildWeightLookups(catalogue: Catalogue): WeightLookups {
+function liveWeights(catalogue: Catalogue): Map<string, number> {
   const live = new Map<string, number>()
   for (const entry of catalogue.vegetables) {
     if (entry.biopoints !== null && entry.biopoints > 0) {
       live.set(compactKey(entry.code), entry.biopoints)
     }
   }
+  return live
+}
 
+function docWeights(): Map<string, number> {
   const docs = new Map<string, number>()
   for (const seed of seeds) {
     const key = produceKey(seed.name)
+    const variants = new Map(Object.entries(seed.variants))
     for (const rarity of RARITIES) {
-      const variant = seed.variants[rarity]
+      const variant = variants.get(rarity)
       if (variant) docs.set(`${rarity}${key}`, variant.biopoints)
     }
   }
@@ -200,6 +206,12 @@ export function buildWeightLookups(catalogue: Catalogue): WeightLookups {
       if (split) docs.set(`${split.rarity}${compactKey(split.rest)}`, product.biopoints)
     }
   }
+  return docs
+}
+
+export function buildWeightLookups(catalogue: Catalogue): WeightLookups {
+  const live = liveWeights(catalogue)
+  const docs = docWeights()
 
   const lookup = (key: string): number | null =>
     key ? (live.get(key) ?? docs.get(key) ?? null) : null
@@ -240,7 +252,7 @@ export function harvestWeight(
     if (each === null) unknown.add(item.name || item.code)
     else weight += each * item.count
   }
-  return { weight, unknown: [...unknown].sort() }
+  return { weight, unknown: [...unknown].sort((a, b) => a.localeCompare(b)) }
 }
 
 /**
@@ -278,6 +290,37 @@ export function findVault(rows: TokenTx[], tokenAddress: string, payoutRaw: numb
   return hit ? hit.to : null
 }
 
+interface ContributionTally {
+  totalWeight: number
+  contributions: number
+  units: number
+  unknownUnits: number
+  contributors: Set<string>
+  unknown: Set<string>
+  lastIn: number
+}
+
+/** Adds one crop transfer into a vault to the running tally. */
+function tallyContribution(tally: ContributionTally, row: TokenTx, at: number, weightOf: WeightLookup): void {
+  tally.contributions += 1
+  tally.contributors.add(row.from.toLowerCase())
+  tally.lastIn = Math.max(tally.lastIn, at)
+  const count = Number(row.value)
+  tally.units += count
+  const weight = weightOf(row.tokenName)
+  if (weight === null) {
+    tally.unknown.add(row.tokenName)
+    tally.unknownUnits += count
+  } else tally.totalWeight += weight * count
+}
+
+/** A block closes at its first payout, else its last contribution, else its opening. */
+function vaultCloseAt(firstPayout: number, lastIn: number, openAt: string): string {
+  return new Date(
+    Number.isFinite(firstPayout) ? firstPayout : lastIn || Date.parse(openAt) || 0,
+  ).toISOString()
+}
+
 /** Everything a vault's transfer list says about its block. */
 export function readVault(
   rows: TokenTx[],
@@ -290,15 +333,17 @@ export function readVault(
 
   let payout = 0
   let openAt = ''
-  let totalWeight = 0
-  let contributions = 0
-  let units = 0
-  let unknownUnits = 0
-  const contributors = new Set<string>()
-  const unknown = new Set<string>()
+  const tally: ContributionTally = {
+    totalWeight: 0,
+    contributions: 0,
+    units: 0,
+    unknownUnits: 0,
+    contributors: new Set<string>(),
+    unknown: new Set<string>(),
+    lastIn: 0,
+  }
   let payees = 0
   let firstPayout = Number.POSITIVE_INFINITY
-  let lastIn = 0
 
   for (const row of rows) {
     const isCurrency = row.contractAddress.toLowerCase() === token
@@ -310,16 +355,7 @@ export function readVault(
         if (!openAt) openAt = new Date(at).toISOString()
         continue
       }
-      contributions += 1
-      contributors.add(row.from.toLowerCase())
-      lastIn = Math.max(lastIn, at)
-      const count = Number(row.value)
-      units += count
-      const weight = weightOf(row.tokenName)
-      if (weight === null) {
-        unknown.add(row.tokenName)
-        unknownUnits += count
-      } else totalWeight += weight * count
+      tallyContribution(tally, row, at, weightOf)
       continue
     }
 
@@ -329,9 +365,7 @@ export function readVault(
     }
   }
 
-  const closeAt = new Date(
-    Number.isFinite(firstPayout) ? firstPayout : lastIn || Date.parse(openAt) || 0,
-  ).toISOString()
+  const closeAt = vaultCloseAt(firstPayout, tally.lastIn, openAt)
 
   return {
     key: blockKey(currency, closeAt),
@@ -340,13 +374,13 @@ export function readVault(
     openAt: openAt || closeAt,
     closeAt,
     payout,
-    totalWeight,
-    contributions,
-    contributors: contributors.size,
+    totalWeight: tally.totalWeight,
+    contributions: tally.contributions,
+    contributors: tally.contributors.size,
     payees,
-    unknown: [...unknown].sort(),
-    units,
-    unknownUnits,
+    unknown: [...tally.unknown].sort((a, b) => a.localeCompare(b)),
+    units: tally.units,
+    unknownUnits: tally.unknownUnits,
   }
 }
 
@@ -458,7 +492,9 @@ export function judgeLiveBlock(live: PoolBlock, history: MarketHistory): LiveJud
   if (!slot || history.complete < 6) return { verdict: 'average', slot, crowd: null, better: null }
 
   const crowd = slot.weight > 0 ? live.totalWeight / slot.weight : null
-  let verdict: Verdict = slot.index >= GOOD_INDEX ? 'good' : slot.index <= WAIT_INDEX ? 'wait' : 'average'
+  let verdict: Verdict = 'average'
+  if (slot.index >= GOOD_INDEX) verdict = 'good'
+  else if (slot.index <= WAIT_INDEX) verdict = 'wait'
   if (crowd !== null && crowd >= CROWDED) verdict = verdict === 'good' ? 'average' : 'wait'
 
   const better =
@@ -542,7 +578,7 @@ export function weighBalances(
     }
   }
 
-  return { totalWeight, units, unknownUnits, unknown: [...unknown].sort(), payout }
+  return { totalWeight, units, unknownUnits, unknown: [...unknown].sort((a, b) => a.localeCompare(b)), payout }
 }
 
 /** Blockscout v1 query URLs, in one place. */
@@ -639,6 +675,90 @@ function toUsd(raw: number, currency: string, priceOf: PriceLookup): number | nu
   return (raw / 10 ** (tokenFor(currency)?.decimals ?? 9)) * price
 }
 
+type LiveReading = LiveReadings[string]
+
+/** The window's lightest, heaviest and usual final weight for a closing slot. */
+function windowWeights(
+  history: MarketHistory,
+  slot: SlotStat | null,
+): { low: number; high: number; usual: number } {
+  const rated = history.blocks.filter((block) => rateOfBlock(block) > 0)
+  const weights = rated.map((block) => block.totalWeight)
+  const low = weights.length > 0 ? Math.min(...weights) : 0
+  const high = weights.length > 0 ? Math.max(...weights) : 0
+  const usual = slot?.weight ?? (weights.length > 0 ? weights.reduce((a, b) => a + b, 0) / weights.length : 0)
+  return { low, high, usual }
+}
+
+/**
+ * The chain reading of the open block beats the capture; a finished block says nothing
+ * about the one open now, so a stale capture without a reading has no weight at all.
+ */
+function liveWeightOf(
+  live: PoolBlock,
+  reading: LiveReading,
+  closesAt: string,
+  stale: boolean,
+): { fromChain: NonNullable<LiveReading> | null; weightSource: PoolAssessment['weightSource']; liveWeight: number } {
+  const fromChain = reading && reading.block.closeAt === closesAt ? reading : null
+  if (fromChain) return { fromChain, weightSource: 'chain', liveWeight: fromChain.block.totalWeight }
+  if (stale) return { fromChain, weightSource: 'none', liveWeight: 0 }
+  return { fromChain, weightSource: 'capture', liveWeight: live.totalWeight }
+}
+
+function assessBlock(
+  pools: Pools,
+  live: PoolBlock,
+  currency: string,
+  history: MarketHistory,
+  reading: LiveReading,
+  bagWeight: number,
+  now: number,
+): PoolAssessment {
+  const group = pools.groups.find((candidate) => candidate.groupCode === live.groupCode)
+  const closesAt = nextCloseAfter(live.endDate, group?.blockTimeSeconds ?? 14_400, now)
+  const stale = closesAt !== live.endDate && Date.parse(live.endDate) <= now
+  const hour = new Date(closesAt).getHours()
+  const slot = history.slots.find((candidate) => candidate.hour === hour) ?? null
+  const { low, high, usual } = windowWeights(history, slot)
+  const { fromChain, weightSource, liveWeight } = liveWeightOf(live, reading, closesAt, stale)
+  const projected = Math.max(liveWeight, usual)
+  return {
+    currency,
+    live,
+    history,
+    stale,
+    weightSource,
+    liveWeight,
+    readAt: fromChain?.at ?? null,
+    vault: fromChain?.block.vault ?? null,
+    closesAt,
+    slot,
+    projected,
+    low,
+    high,
+    position: high > low ? Math.min(1, Math.max(0, (projected - low) / (high - low))) : 0,
+    crowd: usual > 0 ? projected / usual : 0,
+    earn: estimateEarnings(live.payout, bagWeight, usual, liveWeight),
+    earnNow: weightSource === 'none' ? 0 : estimateEarnings(live.payout, bagWeight, 0, liveWeight),
+    earnUsd: null,
+    earnNowUsd: null,
+    ready: history.complete >= 6,
+  }
+}
+
+/**
+ * Money first where money is known; a pool nobody can price is ranked by its own history,
+ * after the priced ones, and the page says so.
+ */
+function comparePools(a: PoolAssessment, b: PoolAssessment, bagWeight: number): number {
+  if (a.ready !== b.ready) return a.ready ? -1 : 1
+  const priced = (entry: PoolAssessment) => entry.earnUsd !== null && bagWeight > 0
+  if (priced(a) !== priced(b)) return priced(a) ? -1 : 1
+  if (priced(a) && priced(b)) return (b.earnUsd ?? 0) - (a.earnUsd ?? 0) || a.position - b.position
+  return a.position - b.position || b.earn - a.earn
+}
+
 export function assessPools(
   pools: Pools,
   histories: Record<string, MarketHistory>,
@@ -648,63 +768,19 @@ export function assessPools(
   priceOf: PriceLookup = () => null,
 ): PoolAssessment[] {
   const out: PoolAssessment[] = []
+  const historyByCurrency = new Map(Object.entries(histories))
+  const readingByCurrency = new Map(Object.entries(readings))
   for (const live of pools.blocks) {
     const currency = blockCurrency(pools, live)
-    const history = histories[currency]
+    const history = historyByCurrency.get(currency)
     if (!history || !tokenFor(currency)) continue
-    const group = pools.groups.find((candidate) => candidate.groupCode === live.groupCode)
-    const closesAt = nextCloseAfter(live.endDate, group?.blockTimeSeconds ?? 14_400, now)
-    const stale = closesAt !== live.endDate && Date.parse(live.endDate) <= now
-    const hour = new Date(closesAt).getHours()
-    const slot = history.slots.find((candidate) => candidate.hour === hour) ?? null
-    const rated = history.blocks.filter((block) => rateOfBlock(block) > 0)
-    const weights = rated.map((block) => block.totalWeight)
-    const low = weights.length > 0 ? Math.min(...weights) : 0
-    const high = weights.length > 0 ? Math.max(...weights) : 0
-    const usual = slot?.weight ?? (weights.length > 0 ? weights.reduce((a, b) => a + b, 0) / weights.length : 0)
-    // The chain reading of the open block beats the capture; a finished block says nothing
-    // about the one open now, so a stale capture without a reading has no weight at all.
-    const reading = readings[currency]
-    const fromChain = reading && reading.block.closeAt === closesAt ? reading : null
-    const weightSource: PoolAssessment['weightSource'] = fromChain ? 'chain' : stale ? 'none' : 'capture'
-    const liveWeight = fromChain ? fromChain.block.totalWeight : stale ? 0 : live.totalWeight
-    const projected = Math.max(liveWeight, usual)
-    out.push({
-      currency,
-      live,
-      history,
-      stale,
-      weightSource,
-      liveWeight,
-      readAt: fromChain?.at ?? null,
-      vault: fromChain?.block.vault ?? null,
-      closesAt,
-      slot,
-      projected,
-      low,
-      high,
-      position: high > low ? Math.min(1, Math.max(0, (projected - low) / (high - low))) : 0,
-      crowd: usual > 0 ? projected / usual : 0,
-      earn: estimateEarnings(live.payout, bagWeight, usual, liveWeight),
-      earnNow: weightSource === 'none' ? 0 : estimateEarnings(live.payout, bagWeight, 0, liveWeight),
-      earnUsd: null,
-      earnNowUsd: null,
-      ready: history.complete >= 6,
-    })
+    out.push(assessBlock(pools, live, currency, history, readingByCurrency.get(currency), bagWeight, now))
   }
   for (const entry of out) {
     entry.earnUsd = toUsd(entry.earn, entry.currency, priceOf)
     entry.earnNowUsd = entry.weightSource === 'none' ? null : toUsd(entry.earnNow, entry.currency, priceOf)
   }
-  // Money first where money is known; a pool nobody can price is ranked by its own history,
-  // after the priced ones, and the page says so.
-  return out.sort((a, b) => {
-    if (a.ready !== b.ready) return a.ready ? -1 : 1
-    const priced = (entry: PoolAssessment) => entry.earnUsd !== null && bagWeight > 0
-    if (priced(a) !== priced(b)) return priced(a) ? -1 : 1
-    if (priced(a) && priced(b)) return (b.earnUsd ?? 0) - (a.earnUsd ?? 0) || a.position - b.position
-    return a.position - b.position || b.earn - a.earn
-  })
+  return out.sort((a, b) => comparePools(a, b, bagWeight))
 }
 
 /**
@@ -766,7 +842,8 @@ export function weighUnits(
       unknownUnits += count
     } else totalWeight += weight * count
   }
-  return { totalWeight, unknown: unknown.sort(), units: total, unknownUnits }
+  unknown.sort((a, b) => a.localeCompare(b))
+  return { totalWeight, unknown, units: total, unknownUnits }
 }
 
 /**
@@ -791,7 +868,7 @@ export function blocksFromSnapshot(
   const schedule = closes.map((closeAt) => ({ closeAt, at: Date.parse(closeAt) }))
   const out: MarketBlock[] = []
   for (const block of snapshot.blocks) {
-    const vaults = key ? block.pools[key] : undefined
+    const vaults = key ? new Map(Object.entries(block.pools)).get(key) : undefined
     const vault = vaults?.find((candidate) => candidate.payout === wanted)
     if (!vault) continue
     const at = Date.parse(block.closeAt)

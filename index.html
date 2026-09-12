@@ -24,8 +24,8 @@
       try {
         var saved = localStorage.getItem('bioplot:state') || localStorage.getItem('chain-proplayer:state')
         var theme = saved ? JSON.parse(saved).theme : 'dark'
-        if (theme === 'system') document.documentElement.removeAttribute('data-theme')
-        else document.documentElement.setAttribute('data-theme', theme === 'light' ? 'light' : 'dark')
+        if (theme === 'system') delete document.documentElement.dataset.theme
+        else document.documentElement.dataset.theme = theme === 'light' ? 'light' : 'dark'
       } catch (error) {
         /* A private window or blocked site data just gets the default. */
       }

@@ -19,7 +19,7 @@
    */
   const alive = () => {
     try {
-      return Boolean(chrome.runtime?.id)
+      return Boolean(globalThis.chrome.runtime?.id)
     } catch {
       return false
     }
@@ -28,7 +28,7 @@
   const send = (message) => {
     try {
       // No response is expected; a rejected promise here is not worth surfacing.
-      const sending = chrome.runtime.sendMessage(message)
+      const sending = globalThis.chrome.runtime.sendMessage(message)
       if (sending && typeof sending.catch === 'function') sending.catch(() => {})
     } catch {
       // The extension was reloaded mid-flight. The next page load starts clean.
@@ -42,6 +42,7 @@
     (event.data.channel === CHANNEL || event.data.channel === SEEN_CHANNEL)
 
   window.addEventListener('message', (event) => {
+    if (event.origin !== window.location.origin) return
     if (!isOurMessage(event) || !alive()) return
 
     const url = String(event.data.url ?? '')

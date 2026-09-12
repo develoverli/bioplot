@@ -27,12 +27,11 @@ let writeTimer = 0
 async function ensureLoaded() {
   if (captures !== null) return
   if (loading === null) {
-    loading = chrome.storage.local
+    loading = globalThis.chrome.storage.local
       .get({ [STORAGE_KEY]: [], [SEEN_KEY]: {} })
-      .then((stored) => {
-        captures = Array.isArray(stored[STORAGE_KEY]) ? stored[STORAGE_KEY] : []
-        seen =
-          stored[SEEN_KEY] && typeof stored[SEEN_KEY] === 'object' ? stored[SEEN_KEY] : {}
+      .then(({ [STORAGE_KEY]: storedCaptures, [SEEN_KEY]: storedSeen }) => {
+        captures = Array.isArray(storedCaptures) ? storedCaptures : []
+        seen = new Map(storedSeen && typeof storedSeen === 'object' ? Object.entries(storedSeen) : [])
       })
   }
   await loading
@@ -64,7 +63,7 @@ function addSeen(item) {
   const key = item.url.split('?')[0]
   if (!key) return
 
-  const previous = seen[key]
+  const previous = seen.get(key)
   if (previous) {
     previous.count += 1
     previous.bytes = item.bytes
@@ -72,19 +71,19 @@ function addSeen(item) {
     previous.at = item.at
     return
   }
-  if (Object.keys(seen).length >= MAX_SEEN) return
-  seen[key] = { bytes: item.bytes, kind: item.kind, count: 1, at: item.at }
+  if (seen.size >= MAX_SEEN) return
+  seen.set(key, { bytes: item.bytes, kind: item.kind, count: 1, at: item.at })
 }
 
 function scheduleWrite() {
   if (writeTimer !== 0) return
   writeTimer = setTimeout(() => {
     writeTimer = 0
-    chrome.storage.local.set({ [STORAGE_KEY]: captures, [SEEN_KEY]: seen })
+    globalThis.chrome.storage.local.set({ [STORAGE_KEY]: captures, [SEEN_KEY]: Object.fromEntries(seen) })
   }, WRITE_DELAY_MS)
 }
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+globalThis.chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (typeof message !== 'object' || message === null) return undefined
 
   if (message.type === 'capture' || message.type === 'seen') {
@@ -100,14 +99,14 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 
   if (message.type === 'get') {
-    ensureLoaded().then(() => sendResponse({ captures, seen }))
+    ensureLoaded().then(() => sendResponse({ captures, seen: Object.fromEntries(seen) }))
     return true
   }
 
   if (message.type === 'clear') {
     captures = []
-    seen = {}
-    chrome.storage.local.set({ [STORAGE_KEY]: [], [SEEN_KEY]: {} }).then(() => sendResponse({ ok: true }))
+    seen = new Map()
+    globalThis.chrome.storage.local.set({ [STORAGE_KEY]: [], [SEEN_KEY]: {} }).then(() => sendResponse({ ok: true }))
     return true
   }
 

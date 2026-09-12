@@ -174,7 +174,7 @@ export function FeedPanel({ bare = false }: { bare?: boolean }) {
 
       <p className="mt-2 text-xs text-faint">
         A range means the recipe can roll more than one result. Animal output assumes the produce
-        matches the feed's rarity, which is how the rest of the farm behaves but is not stated by
+        matches the feed&apos;s rarity, which is how the rest of the farm behaves but is not stated by
         the game. How much an animal eats per day is not reported at all, so feeding is not
         scheduled.
       </p>

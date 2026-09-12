@@ -90,7 +90,26 @@ function tierName(name: string | null, code: string, level: number): string {
   return /^(tier|level)\s*\d*$/i.test(pretty) || pretty === '' ? `Tier ${level + 1}` : pretty
 }
 
+/** A bag worth estimating: weighed, and not empty. */
+function hasBag(bagWeight: number | null): bagWeight is number {
+  return bagWeight !== null && bagWeight > 0
+}
+
 /* ----------------------------------------------------------------------------------------- */
+
+function statusText(market: MarketState): string {
+  const { phase, progressDone, progressTotal, skipped, lastRun, nextRun, snapshotBlocks } = market
+  if (phase === 'reading') {
+    const skippedNote = skipped > 0 ? ` · ${skipped} skipped` : ''
+    if (progressTotal > 0) return `Reading history ${progressDone}/${progressTotal}${skippedNote}`
+    return 'Checking for new blocks'
+  }
+  if (phase === 'failed') return 'Explorer did not answer for some blocks'
+  if (lastRun === null) return 'Waiting for a live block'
+  const nextNote = nextRun ? ` · next ${timeFormat.format(new Date(nextRun))}` : ''
+  const sharedNote = snapshotBlocks > 0 ? ` · ${snapshotBlocks} shared blocks` : ''
+  return `Updated ${timeFormat.format(new Date(lastRun))}${nextNote}${sharedNote}`
+}
 
 /**
  * One quiet line: is the history current, and when does it move next.
@@ -98,18 +117,12 @@ function tierName(name: string | null, code: string, level: number): string {
  * The reading itself is background work; it gets a dot and a count, not a banner.
  */
 export function StatusPill({ market }: { market: MarketState }) {
-  const { phase, progressDone, progressTotal, skipped, lastRun, nextRun, snapshotBlocks, refresh } = market
+  const { phase, refresh } = market
   const reading = phase === 'reading'
-  const tone = phase === 'failed' ? 'bg-[color:var(--danger)]' : reading ? 'bg-[color:var(--warning)]' : 'bg-accent'
-  const text = reading
-    ? progressTotal > 0
-      ? `Reading history ${progressDone}/${progressTotal}${skipped > 0 ? ` · ${skipped} skipped` : ''}`
-      : 'Checking for new blocks'
-    : phase === 'failed'
-      ? 'Explorer did not answer for some blocks'
-      : lastRun !== null
-        ? `Updated ${timeFormat.format(new Date(lastRun))}${nextRun ? ` · next ${timeFormat.format(new Date(nextRun))}` : ''}${snapshotBlocks > 0 ? ` · ${snapshotBlocks} shared blocks` : ''}`
-        : 'Waiting for a live block'
+  let tone = 'bg-accent'
+  if (phase === 'failed') tone = 'bg-[color:var(--danger)]'
+  else if (reading) tone = 'bg-[color:var(--warning)]'
+  const text = statusText(market)
 
   return (
     <span className="flex items-center gap-2 text-xs text-muted" role="status" aria-live="polite">
@@ -197,6 +210,9 @@ export function TierLadder({ pools }: { pools: Pools }) {
           {ladder.map((tier) => {
             const reached = tier.level <= current
             const isCurrent = tier.level === current
+            let nameTone = 'text-faint'
+            if (isCurrent) nameTone = 'font-semibold text-ink'
+            else if (reached) nameTone = 'text-muted'
             return (
               <li
                 key={tier.code}
@@ -217,7 +233,7 @@ export function TierLadder({ pools }: { pools: Pools }) {
                 ) : (
                   <span className={`text-xs font-semibold ${reached ? 'text-ink' : 'text-faint'}`}>T{tier.level + 1}</span>
                 )}
-                <span className={`truncate text-xs ${isCurrent ? 'font-semibold text-ink' : reached ? 'text-muted' : 'text-faint'}`}>
+                <span className={`truncate text-xs ${nameTone}`}>
                   {tierName(tier.name, tier.code, tier.level)}
                 </span>
                 <span className="tabular text-xs text-faint">{formatBiopoints(tier.pointsToClaim)}</span>
@@ -343,7 +359,7 @@ function verdictOf(entry: PoolAssessment): { label: string; className: string } 
  * your share of it today, and what the whole bag would earn if it went in.
  */
 export function PoolsNow({ pools, market }: { pools: Pools; market: MarketState }) {
-  const { ranked, bagWeight, now } = market
+  const { ranked } = market
   if (ranked.length === 0) return null
 
   const groupOf = (block: PoolBlock) => pools.groups.find((group) => group.groupCode === block.groupCode)
@@ -352,124 +368,146 @@ export function PoolsNow({ pools, market }: { pools: Pools; market: MarketState 
     <ul className="grid gap-2 md:grid-cols-3">
       {[...ranked]
         .sort((a, b) => a.currency.localeCompare(b.currency))
-        .map((entry) => {
-          const { live, currency, stale, weightSource, liveWeight } = entry
-          const group = groupOf(live)
-          const left = closesIn(entry.closesAt, now)
-          const share = live.totalWeight > 0 ? live.userWeight / live.totalWeight : 0
-          const verdict = verdictOf(entry)
-          const readAgo = entry.readAt !== null ? Math.max(0, Math.round((now - entry.readAt) / 60_000)) : null
-          const atLow =
-            bagWeight !== null && bagWeight > 0 && entry.ready
-              ? estimateEarnings(live.payout, bagWeight, entry.low)
-              : null
-          return (
-            <li key={currency} className="rounded-xl border border-line bg-surface-2 px-3.5 py-3">
-              <div className="flex items-center gap-2">
-                {group?.icon ? <img src={group.icon} alt="" width={24} height={24} className="size-6 shrink-0" /> : null}
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-ink">{group?.title ?? `${displayCurrency(currency)} pool`}</p>
-                  <p className="tabular text-xs text-faint">{withUsd(live.payout, currency, market)} per block</p>
-                </div>
-                <span className={`rounded-md border px-1.5 py-0.5 text-xs font-semibold ${verdict.className}`}>
-                  {verdict.label}
-                </span>
-              </div>
-
-              {weightSource === 'none' ? (
-                <p className="mt-2.5 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-xs text-muted">
-                  Reading the open block off the chain…
-                  {entry.ready ? ` Blocks closing at this hour usually end near ${formatBiopoints(entry.projected)}.` : ''}
-                </p>
-              ) : (
-                <p className="tabular mt-2.5 flex flex-wrap items-baseline gap-1.5" title={formatExact(liveWeight)}>
-                  <span className="text-xl leading-none font-semibold text-ink">{formatBiopoints(liveWeight)}</span>
-                  <span className="text-xs text-muted">bp in the block now</span>
-                  {entry.ready && entry.slot ? (
-                    <span className="text-xs text-faint">
-                      · usually ends near {formatBiopoints(entry.slot.weight)} ({entry.slot.blocks} sample{entry.slot.blocks === 1 ? '' : 's'})
-                    </span>
-                  ) : null}
-                </p>
-              )}
-              <p className="mt-1 text-xs text-faint">
-                {weightSource === 'chain'
-                  ? `Read off the chain ${readAgo === 0 ? 'just now' : `${readAgo} min ago`}; refreshes every 5 minutes.`
-                  : market.readingOpen
-                    ? 'Reading the open block off the chain…'
-                    : market.liveFailed.includes(currency)
-                      ? 'The explorer would not serve this block, so the weight is your capture, which is as old as your last sync.'
-                      : weightSource === 'capture'
-                        ? 'From your capture, which is as old as your last sync.'
-                        : ''}
-              </p>
-
-              {entry.ready && weightSource !== 'none' ? (
-                <PoolGauge entry={entry} />
-              ) : entry.ready ? null : (
-                <p className="mt-2 text-xs text-faint">
-                  {entry.history.complete} of the last {HISTORY_BLOCKS} blocks read so far; six (a day) are
-                  needed before this one can be placed against them.
-                </p>
-              )}
-
-              <dl className="mt-2.5 divide-y divide-[color:var(--border)] text-xs">
-                <div className="flex justify-between gap-2 py-1">
-                  <dt className="text-faint" title={stale ? 'Your share comes from the capture, and the capture is from a block that already closed.' : undefined}>
-                    Your share{stale ? ' (last capture)' : ' now'}
-                  </dt>
-                  <dd className={`tabular m-0 ${stale ? 'text-faint' : 'text-ink'}`}>
-                    {stale ? 'sync to update' : `${formatPercent(share, 3)} · ${formatAmount(live.payout * share, currency)}`}
-                  </dd>
-                </div>
-                {bagWeight !== null && bagWeight > 0 && entry.ready ? (
-                  <>
-                    {weightSource !== 'none' ? (
-                      <div className="flex justify-between gap-2 py-1">
-                        <dt className="text-faint" title="What the game shows: your share if the block closed with what it holds this second.">
-                          Bag, if it closed now
-                        </dt>
-                        <dd className="tabular m-0 text-ink">≈ {withUsd(entry.earnNow, currency, market)}</dd>
-                      </div>
-                    ) : null}
-                    <div className="flex justify-between gap-2 py-1">
-                      <dt className="text-faint" title="The block keeps filling until it closes; this assumes it ends where blocks closing at this hour usually end.">
-                        Bag, expected at close
-                      </dt>
-                      <dd className="tabular m-0 font-semibold text-accent">≈ {withUsd(entry.earn, currency, market)}</dd>
-                    </div>
-                    {atLow !== null ? (
-                      <div className="flex justify-between gap-2 py-1">
-                        <dt className="text-faint">Bag, at the window low</dt>
-                        <dd className="tabular m-0 text-muted">≈ {withUsd(atLow, currency, market)}</dd>
-                      </div>
-                    ) : null}
-                  </>
-                ) : null}
-                <div className="flex justify-between gap-2 py-1">
-                  <dt className="text-faint">Closes</dt>
-                  <dd className="tabular m-0 text-ink">
-                    {timeFormat.format(new Date(entry.closesAt))} your time
-                    {left > 0 ? ` · in ${formatDuration(left / 1000)}` : ''}
-                    {entry.vault || (live.explorerURL && !stale) ? (
-                      <a
-                        href={entry.vault ? explorerApi.addressPage(entry.vault) : live.explorerURL}
-                        target="_blank"
-                        rel="noreferrer noopener"
-                        className="ml-1.5 inline-flex align-middle text-faint hover:text-accent"
-                        aria-label="Block vault on the explorer"
-                        title="Block vault on the explorer"
-                      >
-                        <ExternalLink size={12} aria-hidden="true" />
-                      </a>
-                    ) : null}
-                  </dd>
-                </div>
-              </dl>
-            </li>
-          )
-        })}
+        .map((entry) => renderPoolCard(entry, groupOf(entry.live), market))}
     </ul>
+  )
+}
+
+/** How fresh the live weight is, and where it came from. */
+function poolSourceNote(entry: PoolAssessment, market: MarketState): string {
+  const { weightSource, currency } = entry
+  if (weightSource === 'chain') {
+    const readAgo = entry.readAt !== null ? Math.max(0, Math.round((market.now - entry.readAt) / 60_000)) : null
+    const ago = readAgo === 0 ? 'just now' : `${readAgo} min ago`
+    return `Read off the chain ${ago}; refreshes every 5 minutes.`
+  }
+  if (market.readingOpen) return 'Reading the open block off the chain…'
+  if (market.liveFailed.includes(currency)) {
+    return 'The explorer would not serve this block, so the weight is your capture, which is as old as your last sync.'
+  }
+  return weightSource === 'capture' ? 'From your capture, which is as old as your last sync.' : ''
+}
+
+function renderPoolWeight(entry: PoolAssessment) {
+  const { weightSource, liveWeight } = entry
+  return weightSource === 'none' ? (
+    <p className="mt-2.5 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-xs text-muted">
+      Reading the open block off the chain…
+      {entry.ready ? ` Blocks closing at this hour usually end near ${formatBiopoints(entry.projected)}.` : ''}
+    </p>
+  ) : (
+    <p className="tabular mt-2.5 flex flex-wrap items-baseline gap-1.5" title={formatExact(liveWeight)}>
+      <span className="text-xl leading-none font-semibold text-ink">{formatBiopoints(liveWeight)}</span>
+      <span className="text-xs text-muted">bp in the block now</span>
+      {entry.ready && entry.slot ? (
+        <span className="text-xs text-faint">
+          · usually ends near {formatBiopoints(entry.slot.weight)} ({entry.slot.blocks} sample{entry.slot.blocks === 1 ? '' : 's'})
+        </span>
+      ) : null}
+    </p>
+  )
+}
+
+function renderPoolGauge(entry: PoolAssessment) {
+  if (entry.ready && entry.weightSource !== 'none') return <PoolGauge entry={entry} />
+  return entry.ready ? null : (
+    <p className="mt-2 text-xs text-faint">
+      {entry.history.complete} of the last {HISTORY_BLOCKS} blocks read so far; six (a day) are
+      needed before this one can be placed against them.
+    </p>
+  )
+}
+
+function renderBagRows(entry: PoolAssessment, market: MarketState) {
+  const { bagWeight } = market
+  if (!(hasBag(bagWeight) && entry.ready)) return null
+  const { live, currency, weightSource } = entry
+  const atLow = estimateEarnings(live.payout, bagWeight, entry.low)
+  return (
+    <>
+      {weightSource !== 'none' ? (
+        <div className="flex justify-between gap-2 py-1">
+          <dt className="text-faint" title="What the game shows: your share if the block closed with what it holds this second.">
+            Bag, if it closed now
+          </dt>
+          <dd className="tabular m-0 text-ink">≈ {withUsd(entry.earnNow, currency, market)}</dd>
+        </div>
+      ) : null}
+      <div className="flex justify-between gap-2 py-1">
+        <dt className="text-faint" title="The block keeps filling until it closes; this assumes it ends where blocks closing at this hour usually end.">
+          Bag, expected at close
+        </dt>
+        <dd className="tabular m-0 font-semibold text-accent">≈ {withUsd(entry.earn, currency, market)}</dd>
+      </div>
+      <div className="flex justify-between gap-2 py-1">
+        <dt className="text-faint">Bag, at the window low</dt>
+        <dd className="tabular m-0 text-muted">≈ {withUsd(atLow, currency, market)}</dd>
+      </div>
+    </>
+  )
+}
+
+function renderVaultLink(entry: PoolAssessment) {
+  const { live, stale } = entry
+  return entry.vault || (live.explorerURL && !stale) ? (
+    <a
+      href={entry.vault ? explorerApi.addressPage(entry.vault) : live.explorerURL}
+      target="_blank"
+      rel="noreferrer noopener"
+      className="ml-1.5 inline-flex align-middle text-faint hover:text-accent"
+      aria-label="Block vault on the explorer"
+      title="Block vault on the explorer"
+    >
+      <ExternalLink size={12} aria-hidden="true" />
+    </a>
+  ) : null
+}
+
+function renderPoolCard(entry: PoolAssessment, group: Pools['groups'][number] | undefined, market: MarketState) {
+  const { live, currency, stale } = entry
+  const left = closesIn(entry.closesAt, market.now)
+  const share = live.totalWeight > 0 ? live.userWeight / live.totalWeight : 0
+  const verdict = verdictOf(entry)
+  return (
+    <li key={currency} className="rounded-xl border border-line bg-surface-2 px-3.5 py-3">
+      <div className="flex items-center gap-2">
+        {group?.icon ? <img src={group.icon} alt="" width={24} height={24} className="size-6 shrink-0" /> : null}
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold text-ink">{group?.title ?? `${displayCurrency(currency)} pool`}</p>
+          <p className="tabular text-xs text-faint">{withUsd(live.payout, currency, market)} per block</p>
+        </div>
+        <span className={`rounded-md border px-1.5 py-0.5 text-xs font-semibold ${verdict.className}`}>
+          {verdict.label}
+        </span>
+      </div>
+
+      {renderPoolWeight(entry)}
+      <p className="mt-1 text-xs text-faint">
+        {poolSourceNote(entry, market)}
+      </p>
+
+      {renderPoolGauge(entry)}
+
+      <dl className="mt-2.5 divide-y divide-[color:var(--border)] text-xs">
+        <div className="flex justify-between gap-2 py-1">
+          <dt className="text-faint" title={stale ? 'Your share comes from the capture, and the capture is from a block that already closed.' : undefined}>
+            Your share{stale ? ' (last capture)' : ' now'}
+          </dt>
+          <dd className={`tabular m-0 ${stale ? 'text-faint' : 'text-ink'}`}>
+            {stale ? 'sync to update' : `${formatPercent(share, 3)} · ${formatAmount(live.payout * share, currency)}`}
+          </dd>
+        </div>
+        {renderBagRows(entry, market)}
+        <div className="flex justify-between gap-2 py-1">
+          <dt className="text-faint">Closes</dt>
+          <dd className="tabular m-0 text-ink">
+            {timeFormat.format(new Date(entry.closesAt))} your time
+            {left > 0 ? ` · in ${formatDuration(left / 1000)}` : ''}
+            {renderVaultLink(entry)}
+          </dd>
+        </div>
+      </dl>
+    </li>
   )
 }
 
@@ -482,29 +520,88 @@ export function PoolsNow({ pools, market }: { pools: Pools; market: MarketState 
  * rule of timing: share is by weight, not by time, so waiting costs nothing and the last
  * minutes are when the block's weight is known.
  */
+function renderNoRecommendation(market: MarketState) {
+  return (
+    <div className="rounded-xl border border-line bg-surface-2 px-3.5 py-3">
+      <p className="text-sm font-semibold text-ink">No recommendation yet</p>
+      <p className="mt-0.5 text-xs text-muted">
+        A verdict needs six settled blocks (a day) per pool.{' '}
+        {market.snapshotBlocks > 0
+          ? `The shared history has ${market.snapshotBlocks}; the rest is read from the chain, about a minute a block.`
+          : 'This site serves no shared history, so every block is read from the chain: about a minute each.'}
+      </p>
+    </div>
+  )
+}
+
+/** Where the recommended block is headed: the usual close for its hour, or above it. */
+function renderExpectedClose(top: PoolAssessment) {
+  if (top.slot && top.liveWeight <= top.slot.weight) {
+    return <>is on track for the usual <span className="text-ink">{formatBiopoints(top.slot.weight)}</span> of blocks closing at this hour ({top.slot.blocks} sample{top.slot.blocks === 1 ? '' : 's'})</>
+  }
+  let usual = ''
+  if (top.slot) {
+    const plural = top.slot.blocks === 1 ? '' : 's'
+    usual = ` (${formatIndex(top.crowd)} above the usual ${formatBiopoints(top.slot.weight)} for this hour, ${top.slot.blocks} sample${plural})`
+  }
+  return <>is expected to close near <span className="text-ink">{formatBiopoints(top.projected)}</span>{usual}</>
+}
+
+function closeNowText(top: PoolAssessment, market: MarketState): string {
+  return top.weightSource !== 'none' && hasBag(market.bagWeight)
+    ? ` If it closed this second the bag would earn ≈ ${withUsd(top.earnNow, top.currency, market)}, which is the number the game shows; the block keeps filling until the close.`
+    : ''
+}
+
+function timingText(top: PoolAssessment, left: number, sendNow: boolean): string {
+  const closeLabel = timeFormat.format(new Date(top.closesAt))
+  return sendNow
+    ? `Send now: closes at ${closeLabel} your time, in ${formatDuration(left / 1000)}.`
+    : `Closes at ${closeLabel} your time, in ${formatDuration(left / 1000)}. Send in the last ${SEND_WINDOW_MS / 60_000} minutes: share is by weight, not by time, so waiting costs nothing, and the less time left the more you know about how heavy the block will end.`
+}
+
+function renderOtherPools(top: PoolAssessment, market: MarketState) {
+  const { ranked, bagWeight } = market
+  if (ranked.length <= 1) return null
+  return (
+    <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 border-t border-line/60 pt-2 text-xs text-muted">
+      {ranked
+        .filter((entry) => entry !== top)
+        .map((entry) => (
+          <li key={entry.currency} className="tabular">
+            <span className="font-medium text-ink">{displayCurrency(entry.currency)}</span>
+            {entry.ready ? (
+              <>
+                {' '}
+                {hasBag(bagWeight) ? `≈ ${withUsd(entry.earn, entry.currency, market)} · ` : ''}
+                {Math.round(entry.position * 100)}% of its range
+                {entry.earnUsd === null && hasBag(bagWeight) ? ' · no price' : ''}
+              </>
+            ) : (
+              <span className="text-faint"> · reading history</span>
+            )}
+          </li>
+        ))}
+    </ul>
+  )
+}
+
+function rankingNote(top: PoolAssessment, market: MarketState): string {
+  return top.earnUsd !== null
+    ? `Ranked by what the bag earns in dollars at ${market.prices?.source ?? 'reference'} prices; pools with no price come after, ranked against their own history only.`
+    : 'Ranked against each pool’s own history. Add a reference price for CFB, or wait for BNB and MATIC prices, to rank in dollars.'
+}
+
 export function Recommendation({ pools, market }: { pools: Pools; market: MarketState }) {
   const { ranked, bagWeight, now } = market
   const top = ranked.find((entry) => entry.ready) ?? null
   const tier = pools.level ? tierName(pools.level.name, pools.level.code, pools.level.level) : 'your tier'
 
-  if (!top) {
-    return (
-      <div className="rounded-xl border border-line bg-surface-2 px-3.5 py-3">
-        <p className="text-sm font-semibold text-ink">No recommendation yet</p>
-        <p className="mt-0.5 text-xs text-muted">
-          A verdict needs six settled blocks (a day) per pool.{' '}
-          {market.snapshotBlocks > 0
-            ? `The shared history has ${market.snapshotBlocks}; the rest is read from the chain, about a minute a block.`
-            : 'This site serves no shared history, so every block is read from the chain: about a minute each.'}
-        </p>
-      </div>
-    )
-  }
+  if (!top) return renderNoRecommendation(market)
 
   const left = closesIn(top.closesAt, now)
   const sendNow = left > 0 && left <= SEND_WINDOW_MS
-  const closeLabel = timeFormat.format(new Date(top.closesAt))
-  const lowEarn = bagWeight !== null && bagWeight > 0 ? estimateEarnings(top.live.payout, bagWeight, top.low) : 0
+  const lowEarn = hasBag(bagWeight) ? estimateEarnings(top.live.payout, bagWeight, top.low) : 0
 
   return (
     <div className="rounded-xl border border-[color:var(--accent)] bg-accent-dim px-3.5 py-3">
@@ -512,7 +609,7 @@ export function Recommendation({ pools, market }: { pools: Pools; market: Market
       <p className="mt-1 flex flex-wrap items-baseline gap-x-2 text-lg font-semibold text-ink">
         <Send size={16} aria-hidden="true" className="text-accent" />
         {displayCurrency(top.currency)}
-        {bagWeight !== null && bagWeight > 0 ? (
+        {hasBag(bagWeight) ? (
           <span className="tabular text-accent">≈ {withUsd(top.earn, top.currency, market)} for the whole bag</span>
         ) : null}
       </p>
@@ -521,12 +618,8 @@ export function Recommendation({ pools, market }: { pools: Pools; market: Market
         {top.weightSource === 'none'
           ? 'The block open now'
           : `Its block holds ${formatBiopoints(top.liveWeight)} now and`}{' '}
-        {top.slot && top.liveWeight <= top.slot.weight
-          ? <>is on track for the usual <span className="text-ink">{formatBiopoints(top.slot.weight)}</span> of blocks closing at this hour ({top.slot.blocks} sample{top.slot.blocks === 1 ? '' : 's'})</>
-          : <>is expected to close near <span className="text-ink">{formatBiopoints(top.projected)}</span>{top.slot ? ` (${formatIndex(top.crowd)} above the usual ${formatBiopoints(top.slot.weight)} for this hour, ${top.slot.blocks} sample${top.slot.blocks === 1 ? '' : 's'})` : ''}</>}.
-        {top.weightSource !== 'none' && bagWeight !== null && bagWeight > 0
-          ? ` If it closed this second the bag would earn ≈ ${withUsd(top.earnNow, top.currency, market)}, which is the number the game shows; the block keeps filling until the close.`
-          : ''}
+        {renderExpectedClose(top)}.
+        {closeNowText(top, market)}
         The lightest of the last {top.history.complete} blocks closed at{' '}
         <span className="text-ink">{formatBiopoints(top.low)}</span>
         {lowEarn > 0 ? ` (the bag would earn ≈ ${withUsd(lowEarn, top.currency, market)} there)` : ''}, the heaviest at{' '}
@@ -538,39 +631,15 @@ export function Recommendation({ pools, market }: { pools: Pools; market: Market
       <p className="mt-2 flex items-start gap-1.5 text-xs font-medium text-ink">
         <Clock size={13} aria-hidden="true" className={`mt-0.5 shrink-0 ${sendNow ? 'text-accent' : 'text-muted'}`} />
         <span>
-          {sendNow
-            ? `Send now: closes at ${closeLabel} your time, in ${formatDuration(left / 1000)}.`
-            : `Closes at ${closeLabel} your time, in ${formatDuration(left / 1000)}. Send in the last ${SEND_WINDOW_MS / 60_000} minutes: share is by weight, not by time, so waiting costs nothing, and the less time left the more you know about how heavy the block will end.`}
+          {timingText(top, left, sendNow)}
           {top.stale ? ' Your capture is from an earlier block; reload the farm page in chainers.io and sync to refresh your share.' : ''}
         </span>
       </p>
 
-      {ranked.length > 1 ? (
-        <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 border-t border-line/60 pt-2 text-xs text-muted">
-          {ranked
-            .filter((entry) => entry !== top)
-            .map((entry) => (
-              <li key={entry.currency} className="tabular">
-                <span className="font-medium text-ink">{displayCurrency(entry.currency)}</span>
-                {entry.ready ? (
-                  <>
-                    {' '}
-                    {bagWeight !== null && bagWeight > 0 ? `≈ ${withUsd(entry.earn, entry.currency, market)} · ` : ''}
-                    {Math.round(entry.position * 100)}% of its range
-                    {entry.earnUsd === null && bagWeight !== null && bagWeight > 0 ? ' · no price' : ''}
-                  </>
-                ) : (
-                  <span className="text-faint"> · reading history</span>
-                )}
-              </li>
-            ))}
-        </ul>
-      ) : null}
+      {renderOtherPools(top, market)}
 
       <p className="mt-2 text-xs text-faint">
-        {top.earnUsd !== null
-          ? `Ranked by what the bag earns in dollars at ${market.prices?.source ?? 'reference'} prices; pools with no price come after, ranked against their own history only.`
-          : 'Ranked against each pool\u2019s own history. Add a reference price for CFB, or wait for BNB and MATIC prices, to rank in dollars.'}
+        {rankingNote(top, market)}
       </p>
     </div>
   )
@@ -728,19 +797,19 @@ export function WeightTable({ market, rows }: { market: MarketState; rows: numbe
                 const rated = rateOfBlock(block) > 0
                 const share = unknownShare(block)
                 const isLow = rated && block.totalWeight === lows.get(currency)
+                let cellTone = 'text-faint'
+                if (isLow) cellTone = 'font-semibold text-accent'
+                else if (rated) cellTone = 'text-ink'
+                let cellTitle = `not rated: ${(share * 100).toFixed(0)}% of units unweighed (${block.unknown.join(', ')})`
+                if (rated) {
+                  const unweighed = share > 0 ? ` · ${(share * 100).toFixed(1)}% of units unweighed: ${block.unknown.join(', ')}` : ''
+                  cellTitle = `${formatExact(block.totalWeight)} · ${formatRate(rateOfBlock(block), currency)} per 1M bp${unweighed}`
+                }
                 return (
                   <td
                     key={currency}
-                    className={`tabular px-3 py-1.5 text-right ${
-                      isLow ? 'font-semibold text-accent' : rated ? 'text-ink' : 'text-faint'
-                    }`}
-                    title={
-                      rated
-                        ? `${formatExact(block.totalWeight)} · ${formatRate(rateOfBlock(block), currency)} per 1M bp${
-                            share > 0 ? ` · ${(share * 100).toFixed(1)}% of units unweighed: ${block.unknown.join(', ')}` : ''
-                          }`
-                        : `not rated: ${(share * 100).toFixed(0)}% of units unweighed (${block.unknown.join(', ')})`
-                    }
+                    className={`tabular px-3 py-1.5 text-right ${cellTone}`}
+                    title={cellTitle}
                   >
                     {share > 0 ? '≈' : ''}
                     {formatBiopoints(block.totalWeight)}
@@ -753,7 +822,7 @@ export function WeightTable({ market, rows }: { market: MarketState; rows: numbe
         </tbody>
       </table>
       <p className="mt-1.5 text-xs text-faint">
-        Green is the window's lightest block, the best a biopoint did. Arrow is the expected close of the live
+        Green is the window&apos;s lightest block, the best a biopoint did. Arrow is the expected close of the live
         block. ≈ means a few percent of that block could not be weighed (hover for which); * means too many, so
         it is shown but not rated.
       </p>

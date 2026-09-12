@@ -1,4 +1,11 @@
-import type { Catalogue, CraftOffer, Inventory, InventoryItem, Rarity } from './types'
+import type {
+  Catalogue,
+  CraftOffer,
+  CraftRecipe,
+  Inventory,
+  InventoryItem,
+  Rarity,
+} from './types'
 
 /**
  * What you could feed your animals with, right now.
@@ -185,6 +192,80 @@ function isFeedOffer(offer: CraftOffer): boolean {
 
 const DAY_SECONDS = 86_400
 
+/** True when one of the recipe's result groups contains the feed. */
+function recipeYields(recipe: CraftRecipe, feedCode: string): boolean {
+  return recipe.resultGroups.some((group) => group.items.some((item) => item.code === feedCode))
+}
+
+/** Feed one recipe makes from what is on hand, or null when it cannot run even once. */
+function craftsFrom(
+  recipe: CraftRecipe,
+  feedCode: string,
+  owned: Map<string, number>,
+): number | null {
+  let runs = Number.POSITIVE_INFINITY
+  for (const item of recipe.requiredItems) {
+    const have = owned.get(item.code) ?? 0
+    runs = Math.min(runs, item.count > 0 ? Math.floor(have / item.count) : 0)
+  }
+  if (!Number.isFinite(runs) || runs <= 0) return null
+
+  const perRun = Math.min(
+    ...recipe.resultGroups.map((group) =>
+      group.items
+        .filter((item) => item.code === feedCode)
+        .reduce((sum, item) => sum + item.count, 0),
+    ),
+  )
+  return runs * Math.max(0, perRun)
+}
+
+/** One crafting offer as a feed option, or null when it is not a feed or has no recipe. */
+function feedOptionFor(offer: CraftOffer, owned: Map<string, number>): FeedOption | null {
+  if (!isFeedOffer(offer)) return null
+
+  const recipe = offer.recipes.find((candidate) => candidate.isDefault) ?? offer.recipes[0]
+  if (!recipe || recipe.requiredItems.length === 0) return null
+
+  let crafts = Number.POSITIVE_INFINITY
+  const blockedBy: string[] = []
+  const cost = recipe.requiredItems.map((item) => {
+    const have = owned.get(item.code) ?? 0
+    const possible = item.count > 0 ? Math.floor(have / item.count) : 0
+    if (possible < crafts) crafts = possible
+    return { name: prettify(item.code), code: item.code, count: item.count, owned: have }
+  })
+
+  if (!Number.isFinite(crafts)) crafts = 0
+  for (const item of cost) {
+    const possible = item.count > 0 ? Math.floor(item.owned / item.count) : 0
+    if (possible === crafts) blockedBy.push(item.name)
+  }
+
+  // A recipe with several result groups is a roll: report both ends rather than an average
+  // nobody can verify.
+  const perGroup = recipe.resultGroups.map((group) =>
+    group.items.reduce((sum, item) => sum + item.count, 0),
+  )
+  const feedPerCraftMin = perGroup.length > 0 ? Math.min(...perGroup) : 0
+  const feedPerCraftMax = perGroup.length > 0 ? Math.max(...perGroup) : 0
+
+  const rarity = (offer.code.split('_')[0] ?? '') as Rarity
+  const known: Rarity[] = ['common', 'uncommon', 'rare', 'epic', 'legendary']
+
+  return {
+    code: offer.code,
+    name: prettify(offer.code),
+    rarity: known.includes(rarity) ? rarity : null,
+    crafts,
+    feedMin: crafts * feedPerCraftMin,
+    feedMax: crafts * feedPerCraftMax,
+    cost,
+    blockedBy: crafts > 0 ? [] : [...new Set(blockedBy)],
+    craftingTimeSeconds: offer.craftingTimeSeconds,
+  }
+}
+
 /**
  * The recipe closest to being makeable.
  *
@@ -274,26 +355,10 @@ export function buildFeedReport(inventory: Inventory, catalogue: Catalogue): Fee
   const craftableCount = (feedCode: string): number => {
     for (const offer of inventory.crafting) {
       for (const recipe of offer.recipes) {
-        const yields = recipe.resultGroups.some((group) =>
-          group.items.some((item) => item.code === feedCode),
-        )
-        if (!yields || recipe.requiredItems.length === 0) continue
+        if (!recipeYields(recipe, feedCode) || recipe.requiredItems.length === 0) continue
 
-        let runs = Number.POSITIVE_INFINITY
-        for (const item of recipe.requiredItems) {
-          const have = owned.get(item.code) ?? 0
-          runs = Math.min(runs, item.count > 0 ? Math.floor(have / item.count) : 0)
-        }
-        if (!Number.isFinite(runs) || runs <= 0) continue
-
-        const perRun = Math.min(
-          ...recipe.resultGroups.map((group) =>
-            group.items
-              .filter((item) => item.code === feedCode)
-              .reduce((sum, item) => sum + item.count, 0),
-          ),
-        )
-        return runs * Math.max(0, perRun)
+        const crafts = craftsFrom(recipe, feedCode, owned)
+        if (crafts !== null) return crafts
       }
     }
     return 0
@@ -340,9 +405,17 @@ export function buildFeedReport(inventory: Inventory, catalogue: Catalogue): Fee
    */
   const feedsMatching = (typeCode: string): FeedChoice[] => {
     if (!typeCode) return []
-    const matcher = new RegExp(`(^|_)${typeCode.replace(/[^a-z0-9_]/gi, '')}_food$`, 'i')
+    const suffix = `${typeCode.replace(/[^a-z0-9_]/gi, '')}_food`.toLowerCase()
     return catalogue.seeds
-      .filter((seed) => matcher.test(seed.code))
+      .filter((seed) => {
+        // "<type>_food" at the very end, either the whole code or right after an underscore.
+        const head = seed.code.length - suffix.length
+        return (
+          head >= 0 &&
+          seed.code.slice(head).toLowerCase() === suffix &&
+          (head === 0 || seed.code.charAt(head - 1) === '_')
+        )
+      })
       .map((seed) => {
         const grow = growability(seed.code)
         return {
@@ -386,10 +459,10 @@ export function buildFeedReport(inventory: Inventory, catalogue: Catalogue): Fee
    */
   const familyOfPlanted = (plantedSeedCode: string | null): string => {
     if (!plantedSeedCode) return ''
-    const withoutRarity = plantedSeedCode.replace(
-      new RegExp(`^(${RARITY_ORDER.join('|')})_`, 'i'),
-      '',
+    const prefix = RARITY_ORDER.find(
+      (rarity) => plantedSeedCode.slice(0, rarity.length + 1).toLowerCase() === `${rarity}_`,
     )
+    const withoutRarity = prefix ? plantedSeedCode.slice(prefix.length + 1) : plantedSeedCode
     return withoutRarity.replace(/_food$/i, '')
   }
 
@@ -486,48 +559,8 @@ export function buildFeedReport(inventory: Inventory, catalogue: Catalogue): Fee
   const options: FeedOption[] = []
 
   for (const offer of inventory.crafting) {
-    if (!isFeedOffer(offer)) continue
-
-    const recipe = offer.recipes.find((candidate) => candidate.isDefault) ?? offer.recipes[0]
-    if (!recipe || recipe.requiredItems.length === 0) continue
-
-    let crafts = Number.POSITIVE_INFINITY
-    const blockedBy: string[] = []
-    const cost = recipe.requiredItems.map((item) => {
-      const have = owned.get(item.code) ?? 0
-      const possible = item.count > 0 ? Math.floor(have / item.count) : 0
-      if (possible < crafts) crafts = possible
-      return { name: prettify(item.code), code: item.code, count: item.count, owned: have }
-    })
-
-    if (!Number.isFinite(crafts)) crafts = 0
-    for (const item of cost) {
-      const possible = item.count > 0 ? Math.floor(item.owned / item.count) : 0
-      if (possible === crafts) blockedBy.push(item.name)
-    }
-
-    // A recipe with several result groups is a roll: report both ends rather than an average
-    // nobody can verify.
-    const perGroup = recipe.resultGroups.map((group) =>
-      group.items.reduce((sum, item) => sum + item.count, 0),
-    )
-    const feedPerCraftMin = perGroup.length > 0 ? Math.min(...perGroup) : 0
-    const feedPerCraftMax = perGroup.length > 0 ? Math.max(...perGroup) : 0
-
-    const rarity = (offer.code.split('_')[0] ?? '') as Rarity
-    const known: Rarity[] = ['common', 'uncommon', 'rare', 'epic', 'legendary']
-
-    options.push({
-      code: offer.code,
-      name: prettify(offer.code),
-      rarity: known.includes(rarity) ? rarity : null,
-      crafts,
-      feedMin: crafts * feedPerCraftMin,
-      feedMax: crafts * feedPerCraftMax,
-      cost,
-      blockedBy: crafts > 0 ? [] : [...new Set(blockedBy)],
-      craftingTimeSeconds: offer.craftingTimeSeconds,
-    })
+    const option = feedOptionFor(offer, owned)
+    if (option) options.push(option)
   }
 
   options.sort((a, b) => b.feedMax - a.feedMax || a.name.localeCompare(b.name))

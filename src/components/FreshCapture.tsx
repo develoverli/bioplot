@@ -70,13 +70,12 @@ export function FreshCapture() {
 
   return (
     <div
-      role="status"
       className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-[color:var(--accent)] bg-accent-dim px-3.5 py-2.5"
     >
       <RefreshCw size={16} aria-hidden="true" className="text-accent" />
-      <p className="text-sm text-ink">
+      <output className="text-sm text-ink">
         Your farm has changed since this plan was made.
-      </p>
+      </output>
 
       <div className="ml-auto flex items-center gap-2">
         <button

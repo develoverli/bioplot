@@ -6,6 +6,8 @@ import {
   getFilteredRowModel,
   getSortedRowModel,
   useReactTable,
+  type CellContext,
+  type SortDirection,
   type SortingState,
 } from '@tanstack/react-table'
 import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react'
@@ -17,6 +19,63 @@ import { useStore } from '../store'
 import { Card, Field, RarityBadge, Select, TextInput, Toggle } from './ui'
 
 const columnHelper = createColumnHelper<RankedVariant>()
+
+function SeedCell(info: CellContext<RankedVariant, string>) {
+  return (
+    <div className="min-w-0">
+      <p className="truncate text-ink">{info.getValue()}</p>
+      <p className="text-xs text-faint">{info.row.original.seed.type}</p>
+    </div>
+  )
+}
+
+function RarityCell(info: CellContext<RankedVariant, Rarity>) {
+  return <RarityBadge rarity={info.getValue()} />
+}
+
+function GrowthCell(info: CellContext<RankedVariant, number>) {
+  return <span className="tabular">{formatDuration(info.getValue())}</span>
+}
+
+function PerHarvestCell(info: CellContext<RankedVariant, number>) {
+  return (
+    <span className="tabular" title={formatExact(info.getValue())}>
+      {formatBiopoints(info.getValue())}
+    </span>
+  )
+}
+
+function HarvestsCell(info: CellContext<RankedVariant, number>) {
+  return <span className="tabular">{info.getValue()}</span>
+}
+
+function PerHourCell(info: CellContext<RankedVariant, number>) {
+  return (
+    <span className="tabular text-muted" title={formatExact(info.getValue())}>
+      {formatBiopoints(info.getValue())}
+    </span>
+  )
+}
+
+function BankedCell(info: CellContext<RankedVariant, number>) {
+  return (
+    <span className="tabular font-semibold text-accent" title={formatExact(info.getValue())}>
+      {formatBiopoints(info.getValue())}
+    </span>
+  )
+}
+
+function ariaSortOf(sorted: false | SortDirection): 'ascending' | 'descending' | 'none' {
+  if (sorted === 'asc') return 'ascending'
+  if (sorted === 'desc') return 'descending'
+  return 'none'
+}
+
+function renderSortIcon(sorted: false | SortDirection) {
+  if (sorted === 'asc') return <ArrowUp size={13} aria-hidden="true" />
+  if (sorted === 'desc') return <ArrowDown size={13} aria-hidden="true" />
+  return <ChevronsUpDown size={13} aria-hidden="true" className="opacity-40" />
+}
 
 const LAMP_OPTIONS = [
   { value: 'none', label: 'No lamp' },
@@ -76,57 +135,40 @@ export function RankingPanel({
       columnHelper.accessor((row) => row.seed.name, {
         id: 'seed',
         header: 'Seed',
-        cell: (info) => (
-          <div className="min-w-0">
-            <p className="truncate text-ink">{info.getValue()}</p>
-            <p className="text-xs text-faint">{info.row.original.seed.type}</p>
-          </div>
-        ),
+        cell: SeedCell,
       }),
       columnHelper.accessor('rarity', {
         header: 'Rarity',
-        cell: (info) => <RarityBadge rarity={info.getValue()} />,
+        cell: RarityCell,
         sortingFn: (a, b) =>
           RARITIES.indexOf(a.original.rarity) - RARITIES.indexOf(b.original.rarity),
       }),
       columnHelper.accessor((row) => row.outcome.growthSec, {
         id: 'growthSec',
         header: 'Grow',
-        cell: (info) => <span className="tabular">{formatDuration(info.getValue())}</span>,
+        cell: GrowthCell,
         meta: { align: 'right' as const },
       }),
       columnHelper.accessor((row) => row.outcome.biopoints, {
         id: 'perHarvest',
         header: 'Per harvest',
-        cell: (info) => (
-          <span className="tabular" title={formatExact(info.getValue())}>
-            {formatBiopoints(info.getValue())}
-          </span>
-        ),
+        cell: PerHarvestCell,
         meta: { align: 'right' as const },
       }),
       columnHelper.accessor('cycles', {
         header: 'Harvests',
-        cell: (info) => <span className="tabular">{info.getValue()}</span>,
+        cell: HarvestsCell,
         meta: { align: 'right' as const },
       }),
       columnHelper.accessor((row) => row.outcome.biopointsPerHour, {
         id: 'perHour',
         header: 'Bp / hour',
-        cell: (info) => (
-          <span className="tabular text-muted" title={formatExact(info.getValue())}>
-            {formatBiopoints(info.getValue())}
-          </span>
-        ),
+        cell: PerHourCell,
         meta: { align: 'right' as const },
       }),
       columnHelper.accessor('horizonBiopoints', {
         header: 'Banked',
-        cell: (info) => (
-          <span className="tabular font-semibold text-accent" title={formatExact(info.getValue())}>
-            {formatBiopoints(info.getValue())}
-          </span>
-        ),
+        cell: BankedCell,
         meta: { align: 'right' as const },
       }),
     ],
@@ -251,13 +293,7 @@ export function RankingPanel({
                     <th
                       key={header.id}
                       scope="col"
-                      aria-sort={
-                        sorted === 'asc'
-                          ? 'ascending'
-                          : sorted === 'desc'
-                            ? 'descending'
-                            : 'none'
-                      }
+                      aria-sort={ariaSortOf(sorted)}
                       className={`border-b border-line px-3 py-2 font-medium ${
                         align ? 'text-right' : 'text-left'
                       }`}
@@ -270,13 +306,7 @@ export function RankingPanel({
                         }`}
                       >
                         {flexRender(header.column.columnDef.header, header.getContext())}
-                        {sorted === 'asc' ? (
-                          <ArrowUp size={13} aria-hidden="true" />
-                        ) : sorted === 'desc' ? (
-                          <ArrowDown size={13} aria-hidden="true" />
-                        ) : (
-                          <ChevronsUpDown size={13} aria-hidden="true" className="opacity-40" />
-                        )}
+                        {renderSortIcon(sorted)}
                       </button>
                     </th>
                   )

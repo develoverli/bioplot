@@ -1,2 +1,11 @@
 allowBuilds:
   esbuild: true
+minimumReleaseAge: 10080
+trustPolicy: no-downgrade
+# Verified 2026-09-12: vite 5.4.21 carries SLSA provenance from vitejs/vite (tag v5.4.21);
+# semver 6.3.1 is the 2023 ReDoS fix, published before that line adopted provenance.
+# Both are build and test tooling only, never shipped. Excluded by exact version, so any
+# other version of either package is still checked.
+trustPolicyExclude:
+  - vite@5.4.21
+  - semver@6.3.1

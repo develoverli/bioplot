@@ -242,7 +242,7 @@ for (const seed of seeds) {
   seedIdByName.set(normaliseName(seed.name), seed.id)
   seedIdByName.set(normaliseName(seed.id), seed.id)
   // "Corn Seed" should also answer to "corn".
-  seedIdByName.set(normaliseName(seed.name.replace(/\s*seeds?$/i, '')), seed.id)
+  seedIdByName.set(normaliseName(seed.name.replace(/seeds?$/i, '')), seed.id)
 }
 
 export function matchSeedId(value: string | undefined): string | undefined {
@@ -258,6 +258,16 @@ function matchRarity(value: string): Rarity | undefined {
 
 const landIds = new Set(lands.map((land) => land.id))
 
+function rowSeedId(row: ImportPayload['seeds'][number]): string | undefined {
+  return row.seedId && getSeed(row.seedId) ? row.seedId : matchSeedId(row.name)
+}
+
+function plotGroupKey(row: ImportPayload['plots'][number], rarity: Rarity): string {
+  const landId = row.landId && landIds.has(row.landId) ? row.landId : defaultLandId
+  const lamp = row.lamp && (LAMP_RARITIES as readonly string[]).includes(row.lamp) ? row.lamp : null
+  return `${rarity}|${landId}|${lamp ?? 'none'}`
+}
+
 /** Turns an extension capture into an inventory this app can plan with. */
 export function fromImportPayload(payload: ImportPayload): ImportResult {
   const stacks = new Map<string, number>()
@@ -265,7 +275,7 @@ export function fromImportPayload(payload: ImportPayload): ImportResult {
   let matched = 0
 
   for (const row of payload.seeds) {
-    const seedId = row.seedId && getSeed(row.seedId) ? row.seedId : matchSeedId(row.name)
+    const seedId = rowSeedId(row)
     const rarity = matchRarity(row.rarity)
     if (!seedId || !rarity) {
       unmatched.push(row.name ?? row.seedId ?? 'unknown seed')
@@ -284,9 +294,7 @@ export function fromImportPayload(payload: ImportPayload): ImportResult {
       continue
     }
     matched += 1
-    const landId = row.landId && landIds.has(row.landId) ? row.landId : defaultLandId
-    const lamp = row.lamp && (LAMP_RARITIES as readonly string[]).includes(row.lamp) ? row.lamp : null
-    const key = `${rarity}|${landId}|${lamp ?? 'none'}`
+    const key = plotGroupKey(row, rarity)
     plotGroups.set(key, (plotGroups.get(key) ?? 0) + Math.floor(row.count))
   }
 
