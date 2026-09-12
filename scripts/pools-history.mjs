@@ -15,9 +15,12 @@
  * that only a vault does. Weights are NOT applied here: the app does that with the player's captured
  * catalogue, which knows event crops the docs do not.
  *
- *   node scripts/pools-history.mjs                 # read whatever settled since the last run
- *   node scripts/pools-history.mjs --backfill 6    # first run: also read the 6 blocks before
+ *   node scripts/pools-history.mjs                 # fill towards the target window
+ *   node scripts/pools-history.mjs --target 50     # blocks the file should hold (default 50)
  *   node scripts/pools-history.mjs --max 4         # cap the blocks read in one run (default 6)
+ *
+ * Each run takes the newest settled blocks first and then works backwards, so an hourly
+ * schedule reaches a full window in about a day and keeps it current afterwards.
  *
  * Node 20+, stdlib only.
  */
@@ -48,7 +51,8 @@ const flag = (name, fallback) => {
   const i = args.indexOf(name)
   return i >= 0 && args[i + 1] !== undefined ? Number(args[i + 1]) : fallback
 }
-const BACKFILL = flag('--backfill', 0)
+/** How many settled blocks the file should hold; the app's own window is fifty. */
+const TARGET = flag('--target', 50) + flag('--backfill', 0)
 const MAX_PER_RUN = flag('--max', 6)
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -277,33 +281,55 @@ async function loadSnapshot() {
   }
 }
 
-/** Every close that has settled by now, newest first, that the snapshot does not have. */
+/**
+ * The closes the file is still missing, newest first.
+ *
+ * The window is the last TARGET settled closes, counted back from the newest one that has had
+ * time to settle. Everything in it the file does not already hold is missing, so one rule
+ * covers both "read what just closed" and "fill the history in behind it".
+ */
 function missingCloses(snapshot, now) {
   const step = BLOCK_SECONDS * 1000
   const have = new Set(snapshot.blocks.map((block) => block.closeAt))
   let latest = Date.parse(snapshot.anchorCloseAt)
   while (latest + step + GRACE_MS <= now) latest += step
-  // Newer than the snapshot always; with --backfill, also that many blocks before its oldest.
-  const newest = snapshot.blocks[0] ? Date.parse(snapshot.blocks[0].closeAt) : null
-  const oldest = snapshot.blocks.length ? Date.parse(snapshot.blocks[snapshot.blocks.length - 1].closeAt) : latest
-  const floor = BACKFILL > 0 ? oldest - BACKFILL * step : (newest ?? latest)
   const closes = []
-  for (let at = latest; at >= floor; at -= step) {
-    const iso = new Date(at).toISOString()
+  for (let i = 0; i < TARGET; i += 1) {
+    const iso = new Date(latest - i * step).toISOString()
     if (!have.has(iso)) closes.push(iso)
   }
   return closes
 }
 
+/** Closes older than the window: dropped, so the file stays the size the app reads. */
+function expiredCloses(snapshot, now) {
+  const step = BLOCK_SECONDS * 1000
+  let latest = Date.parse(snapshot.anchorCloseAt)
+  while (latest + step + GRACE_MS <= now) latest += step
+  const floor = latest - (TARGET - 1) * step
+  return new Set(
+    snapshot.blocks.filter((block) => Date.parse(block.closeAt) < floor).map((block) => block.closeAt),
+  )
+}
+
 async function main() {
   const snapshot = await loadSnapshot()
   const now = Date.now()
-  const closes = missingCloses(snapshot, now).slice(0, MAX_PER_RUN)
+  const expired = expiredCloses(snapshot, now)
+  if (expired.size > 0) {
+    snapshot.blocks = snapshot.blocks.filter((block) => !expired.has(block.closeAt))
+    console.log(`dropped ${expired.size} block(s) older than the ${TARGET}-block window`)
+  }
+  const pending = missingCloses(snapshot, now)
+  const closes = pending.slice(0, MAX_PER_RUN)
   if (closes.length === 0) {
-    console.log('nothing new: newest settled block is already in the snapshot')
+    console.log(`window full: ${snapshot.blocks.length} of ${TARGET} blocks`)
+    if (expired.size > 0) await flush(snapshot)
     return
   }
-  console.log(`reading ${closes.length} block(s): ${closes.join(', ')}`)
+  console.log(
+    `snapshot holds ${snapshot.blocks.length} of ${TARGET} blocks; ${pending.length} missing, reading ${closes.length} now`,
+  )
 
   let added = 0
   for (const closeAt of closes) {
@@ -324,17 +350,24 @@ async function main() {
       console.warn(`  ${closeAt}: ${error instanceof Error ? error.message : String(error)}; skipped`)
     }
   }
-  if (added === 0) {
+  if (added === 0 && expired.size === 0) {
     console.log('no block could be read; snapshot unchanged')
     process.exitCode = 0
     return
   }
 
+  await flush(snapshot)
+}
+
+async function flush(snapshot) {
   snapshot.blocks.sort((a, b) => Date.parse(b.closeAt) - Date.parse(a.closeAt))
   snapshot.updatedAt = new Date().toISOString()
+  snapshot.window = TARGET
   await mkdir(path.dirname(OUT), { recursive: true })
   await writeFile(OUT, JSON.stringify(snapshot) + '\n')
-  console.log(`wrote ${path.relative(process.cwd(), OUT)}: ${snapshot.blocks.length} blocks, newest ${snapshot.blocks[0].closeAt}`)
+  console.log(
+    `wrote ${path.relative(process.cwd(), OUT)}: ${snapshot.blocks.length} of ${TARGET} blocks, newest ${snapshot.blocks[0]?.closeAt ?? 'none'}`,
+  )
 }
 
 main().catch((error) => {

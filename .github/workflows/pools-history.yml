@@ -6,21 +6,25 @@ name: Pools history
 # chain for what is newer. No account, no token, no server. See docs/market-rate.md.
 #
 # Blocks close every four hours at :49 UTC; running hourly at :57 catches each close a few
-# minutes after its payouts land and costs a no-op the other hours.
+# minutes after its payouts land, and the runs in between fill the window in behind it until
+# the file holds the target (50 blocks, about eight days of history).
+#
+# GitHub can delay the first scheduled run of a brand-new workflow by up to an hour, so seed
+# it once by hand: Actions, Pools history, Run workflow.
 
 on:
   schedule:
     - cron: '57 * * * *'
   workflow_dispatch:
     inputs:
-      backfill:
-        description: 'Blocks before the newest to read on a fresh snapshot'
+      target:
+        description: 'How many settled blocks the file should hold'
         required: false
-        default: '0'
+        default: '50'
       max:
-        description: 'Blocks to read in this run'
+        description: 'Blocks to read in this run (about 80 seconds each)'
         required: false
-        default: '6'
+        default: '20'
 
 permissions:
   contents: write
@@ -39,11 +43,13 @@ jobs:
         with:
           node-version: 22
 
-      - name: Read new blocks from the explorer
+      # Newest first, then backwards, so an hourly schedule reaches a full window in a day.
+      - name: Read blocks from the explorer
+        timeout-minutes: 50
         run: >
           node scripts/pools-history.mjs
-          --backfill ${{ github.event.inputs.backfill || '0' }}
-          --max ${{ github.event.inputs.max || '6' }}
+          --target ${{ github.event.inputs.target || '50' }}
+          --max ${{ github.event.inputs.max || '8' }}
 
       - name: Commit when the snapshot changed
         run: |

@@ -105,8 +105,12 @@ So the repository keeps one copy for everyone:
   five or more transfers of a reward currency can only be a vault (the game mints CFB to
   players all day, so the funding second is a poor place to look). The funding amount is then
   read off the vault itself. One block is twelve vaults and about 80 seconds.
-- `.github/workflows/pools-history.yml` runs it every hour and commits the file when a block
-  settled (six commits a day, by `bioplot-bot`). Pages redeploys on the push.
+- `.github/workflows/pools-history.yml` runs it every hour and commits the file whenever it
+  changed, as `bioplot-bot`. Each run reads the newest settled blocks first and then works
+  backwards, so a fresh file reaches the full fifty in about a day and stays current after
+  that; blocks that fall out of the window are dropped. Pages redeploys on the push.
+- GitHub can delay the first scheduled run of a brand-new workflow by up to an hour. Seed it
+  by hand once (Actions, Pools history, Run workflow) rather than waiting for the schedule.
 - The file stores **units per crop token** per vault, never weights. The app weighs them with
   the player's captured catalogue when it loads the file, so event crops the docs do not know
   are weighed correctly by anyone who has synced, and old blocks improve with a newer catalogue.
@@ -122,10 +126,11 @@ The app fetches `pools-history.json` from its own origin first, then reads from 
 the closes newer than the snapshot. Without the file (local dev, a fork that has not enabled
 the workflow) it reads the chain directly, as before.
 
-To seed a fresh fork, run the workflow by hand with a `backfill` of a few blocks, or locally:
+To seed a fresh fork, run the workflow by hand (its `max` input is how many blocks that run
+reads), or locally:
 
 ```sh
-node scripts/pools-history.mjs --backfill 6
+node scripts/pools-history.mjs --target 50 --max 12
 ```
 
 GitHub disables scheduled workflows on repositories with no activity for sixty days; the bot's

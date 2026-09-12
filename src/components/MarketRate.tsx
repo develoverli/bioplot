@@ -403,7 +403,10 @@ export function PoolsNow({ pools, market }: { pools: Pools; market: MarketState 
               {entry.ready && weightSource !== 'none' ? (
                 <PoolGauge entry={entry} />
               ) : entry.ready ? null : (
-                <p className="mt-2 text-xs text-faint">A day of settled blocks is needed before this block can be placed.</p>
+                <p className="mt-2 text-xs text-faint">
+                  {entry.history.complete} of the last {HISTORY_BLOCKS} blocks read so far; six (a day) are
+                  needed before this one can be placed against them.
+                </p>
               )}
 
               <dl className="mt-2.5 divide-y divide-[color:var(--border)] text-xs">
@@ -485,7 +488,10 @@ export function Recommendation({ pools, market }: { pools: Pools; market: Market
       <div className="rounded-xl border border-line bg-surface-2 px-3.5 py-3">
         <p className="text-sm font-semibold text-ink">No recommendation yet</p>
         <p className="mt-0.5 text-xs text-muted">
-          A verdict needs a day of settled blocks per pool. The history fills in the background.
+          A verdict needs six settled blocks (a day) per pool.{' '}
+          {market.snapshotBlocks > 0
+            ? `The shared history has ${market.snapshotBlocks}; the rest is read from the chain, about a minute a block.`
+            : 'This site serves no shared history, so every block is read from the chain: about a minute each.'}
         </p>
       </div>
     )
