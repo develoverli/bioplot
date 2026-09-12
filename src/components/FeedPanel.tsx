@@ -3,6 +3,7 @@ import { PawPrint } from 'lucide-react'
 import { buildFeedReport } from '../lib/feed'
 import { formatBiopoints, formatDuration } from '../lib/format'
 import { useStore } from '../store'
+import { FeedAdvice } from './FeedAdvice'
 import { BareFrame, Card, RarityBadge } from './ui'
 
 /**
@@ -41,28 +42,41 @@ export function FeedPanel({ bare = false }: { bare?: boolean }) {
       } you can make now`}
     >
       {report.animals.length > 0 ? (
-        <ul className="mb-4 flex flex-wrap gap-1.5">
+        <ul className="mb-4 grid gap-2 lg:grid-cols-2">
           {report.animals.map((animal) => (
-            <li
-              key={animal.id}
-              className="flex items-center gap-2 rounded-lg border border-line bg-surface-2 px-2 py-1.5 text-xs"
-            >
-              {animal.image ? (
-                <img src={animal.image} alt="" width={22} height={22} className="size-5.5" />
-              ) : (
-                <PawPrint size={14} aria-hidden="true" className="text-muted" />
-              )}
-              <span className="text-ink">{animal.name}</span>
-              <RarityBadge rarity={animal.rarity} />
-              {animal.feeding ? (
-                <span className="text-faint">fed</span>
-              ) : animal.best ? (
-                <span className="text-[color:var(--warning)]">
-                  give {animal.best.name}
-                </span>
-              ) : (
-                <span className="text-[color:var(--danger)]">no feed</span>
-              )}
+            <li key={animal.id} className="rounded-xl border border-line bg-surface-2 px-3 py-2.5">
+              <div className="flex items-center gap-2.5">
+                {animal.image ? (
+                  <img src={animal.image} alt="" width={36} height={36} className="size-9 shrink-0" />
+                ) : (
+                  <PawPrint size={18} aria-hidden="true" className="shrink-0 text-muted" />
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-ink">{animal.name}</p>
+                  <p className="flex flex-wrap items-center gap-x-2 text-xs">
+                    <RarityBadge rarity={animal.rarity} />
+                    {animal.feeding ? (
+                      <span className="text-faint">
+                        growing {animal.feeding.replace(/_/g, ' ')}
+                      </span>
+                    ) : (
+                      <span className="text-[color:var(--warning)]">nothing growing</span>
+                    )}
+                  </p>
+                </div>
+                {animal.ideal ? (
+                  <span
+                    className="tabular shrink-0 text-xs text-muted"
+                    title={`${animal.ideal.productName}: ${animal.ideal.cycles} a day`}
+                  >
+                    <span className="font-semibold text-accent">
+                      {formatBiopoints(animal.ideal.biopointsPerDay)}
+                    </span>{' '}
+                    bp / day
+                  </span>
+                ) : null}
+              </div>
+              <FeedAdvice animal={animal} />
             </li>
           ))}
         </ul>

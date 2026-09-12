@@ -99,6 +99,21 @@ export interface FarmAnimal {
   obtainable: FeedChoice | null
   /** The best you can keep making, because you own the seeds for its ingredients. */
   sustainable: FeedChoice | null
+  /**
+   * What to actually put in the pen: the strongest feed you can make, renewable first.
+   *
+   * Holding a feed is not the same as being able to make it. A legendary feed from an event
+   * runs out, and its recipe may need seeds you have never owned, so it is never the
+   * recommendation; the strongest craftable one is.
+   */
+  recommended: FeedChoice | null
+  /** Feed on hand that cannot be made again: worth using, not worth planning around. */
+  stockOnly: FeedChoice | null
+  /**
+   * With nothing craftable, the recipe that is fewest seeds away, lowest rarity on a tie,
+   * and exactly what it is short of.
+   */
+  nearest: { feed: FeedChoice; short: FeedNeed[] } | null
   /** When nothing is on hand: the cheapest recipe that would fix it. */
   /**
    * Why this animal cannot be fed for good, ingredient by ingredient.
@@ -169,6 +184,29 @@ function isFeedOffer(offer: CraftOffer): boolean {
 }
 
 const DAY_SECONDS = 86_400
+
+/**
+ * The recipe closest to being makeable.
+ *
+ * Fewest ingredients with neither the produce nor its seed wins; then fewest ingredients
+ * short at all; then the lowest rarity, because a common feed is the one to reach first.
+ */
+function nearestRecipe(feeds: FeedChoice[]): { feed: FeedChoice; short: FeedNeed[] } | null {
+  const known = feeds.filter((feed) => feed.needs.length > 0)
+  if (known.length === 0) return null
+  const score = (feed: FeedChoice) => {
+    const short = feed.needs.filter((need) => need.owned < need.count)
+    const dead = short.filter((need) => !need.hasSeed)
+    return [dead.length, short.length, RARITY_ORDER.indexOf(feed.rarity)] as const
+  }
+  const ranked = [...known].sort((a, b) => {
+    const [ad, as_, ar] = score(a)
+    const [bd, bs, br] = score(b)
+    return ad - bd || as_ - bs || ar - br
+  })
+  const feed = ranked[0]!
+  return { feed, short: feed.needs.filter((need) => need.owned < need.count) }
+}
 
 export function buildFeedReport(inventory: Inventory, catalogue: Catalogue): FeedReport {
   const owned = ownedByCode(inventory.items)
@@ -410,6 +448,11 @@ export function buildFeedReport(inventory: Inventory, catalogue: Catalogue): Fee
           feeds.find((feed) => feed.owned > 0 || feed.craftable > 0) ?? null
         // The one worth planning around: you can make it again tomorrow, and the day after.
         const sustainable = feeds.find((feed) => feed.sustainable) ?? null
+        const recommended = sustainable ?? feeds.find((feed) => feed.craftable > 0) ?? null
+        const stockOnly =
+          feeds.find((feed) => feed.owned > 0 && !feed.sustainable && feed.craftable === 0) ??
+          null
+        const nearest = recommended ? null : nearestRecipe(feeds)
 
         return {
           id: bed.id,
@@ -429,8 +472,13 @@ export function buildFeedReport(inventory: Inventory, catalogue: Catalogue): Fee
             : recipeFor((obtainable ?? best ?? feeds[0])?.code ?? ''),
           obtainable,
           sustainable,
+          recommended,
+          stockOnly,
+          nearest,
           output: outputFor(code, best ?? undefined),
-          ideal: outputFor(code, sustainable ?? obtainable ?? undefined),
+          // The ideal is what you can keep doing: the craftable feed, or failing that what is
+          // on hand today.
+          ideal: outputFor(code, recommended ?? best ?? undefined),
         }
       }),
   )

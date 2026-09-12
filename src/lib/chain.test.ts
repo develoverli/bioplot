@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
   CURRENCY_TOKENS,
+  assessPools,
+  blockCurrency,
   buildMarketHistory,
   buildWeightLookup,
+  buildWeightLookups,
+  estimateEarnings,
   findVault,
+  harvestWeight,
   judgeLiveBlock,
   readVault,
   settledCloses,
@@ -11,7 +16,7 @@ import {
   type MarketBlock,
   type TokenTx,
 } from './chain'
-import { emptyCatalogue, type PoolBlock } from './types'
+import { emptyCatalogue, emptyPools, type PoolBlock } from './types'
 
 const CFB = CURRENCY_TOKENS.CFB!.address
 const VAULT = '0x2c234e68dAAA98da8BaddebEb1785BB9D5412cD0'
@@ -210,5 +215,110 @@ describe('settledCloses', () => {
   it('waits for the grace period before counting a fresh close', () => {
     const now = Date.parse('2026-09-12T08:50:00Z')
     expect(settledCloses('2026-09-12T12:49:18Z', 14_400, 1, now)).toEqual(['2026-09-12T04:49:18.000Z'])
+  })
+})
+
+describe('blockCurrency', () => {
+  const block = (overrides: Partial<PoolBlock>): PoolBlock => ({
+    code: 'x',
+    groupCode: 'g',
+    currency: '',
+    payout: 1,
+    totalWeight: 0,
+    userWeight: 0,
+    startDate: '',
+    endDate: '',
+    explorerURL: '',
+    ...overrides,
+  })
+
+  it('takes the row, then the group, then the group code', () => {
+    expect(blockCurrency(emptyPools, block({ currency: 'cfb' }))).toBe('CFB')
+    const pools = {
+      ...emptyPools,
+      groups: [{ groupCode: 'g', title: 'g', currency: 'BNB', icon: null, blockTimeSeconds: 14_400 }],
+    }
+    expect(blockCurrency(pools, block({}))).toBe('BNB')
+    expect(blockCurrency(emptyPools, block({ groupCode: 'farmPOL' }))).toBe('POL')
+    expect(blockCurrency(emptyPools, block({ groupCode: 'mystery' }))).toBe('')
+  })
+})
+
+describe('harvestWeight', () => {
+  it('weighs produce in the bag by item code and names what it cannot weigh', () => {
+    const { byCode } = buildWeightLookups({
+      ...emptyCatalogue,
+      vegetables: [
+        { code: 'common_corn', rarity: 'common', name: 'corn', biopoints: 7, growthSec: null, image: null },
+      ],
+    })
+    const result = harvestWeight(
+      [
+        { itemType: 'farmVegetables', code: 'common_corn', rarity: 'common', name: 'Corn', count: 3 },
+        { itemType: 'farmSeeds', code: 'common_corn_seeds', rarity: 'common', name: 'Corn seeds', count: 9 },
+        { itemType: 'farmVegetables', code: 'common_moon_rock', rarity: 'common', name: 'Moon Rock', count: 1 },
+      ],
+      byCode,
+    )
+    expect(result.weight).toBe(21)
+    expect(result.unknown).toEqual(['Moon Rock'])
+  })
+})
+
+describe('estimateEarnings', () => {
+  it('pays the share of the block after adding the contribution itself', () => {
+    // 850 payout, block usually ends at 100 weight, you add 100: half of it.
+    expect(estimateEarnings(850, 100, 100)).toBeCloseTo(425)
+    // The live block is already fuller than usual, so it is the live weight that counts.
+    expect(estimateEarnings(850, 100, 100, 300)).toBeCloseTo(850 * 100 / 400)
+    expect(estimateEarnings(850, 0, 100)).toBe(0)
+  })
+})
+
+describe('assessPools', () => {
+  const liveBlock = (currency: string, totalWeight: number, payout: number): PoolBlock => ({
+    code: `${currency}_0`,
+    groupCode: `farm${currency}`,
+    currency,
+    payout,
+    totalWeight,
+    userWeight: 0,
+    startDate: localClose(8),
+    endDate: localClose(8),
+    explorerURL: '',
+  })
+  const windowOf = (currency: string, weights: number[]) =>
+    buildMarketHistory(
+      currency,
+      weights.map((weight, i) => ({
+        ...block(localClose(8, i), 850, weight),
+        key: `${currency}:${localClose(8, i)}`,
+        currency,
+      })),
+    )
+
+  it('ranks the pool whose block sits lowest against its own history first', () => {
+    const pools = {
+      ...emptyPools,
+      blocks: [liveBlock('CFB', 100, 850), liveBlock('BNB', 300, 32)],
+    }
+    const histories = {
+      CFB: windowOf('CFB', [100, 200, 300, 400, 500, 600]),
+      BNB: windowOf('BNB', [100, 200, 300, 400, 500, 600]),
+    }
+    const ranked = assessPools(pools, histories, 50)
+    expect(ranked.map((entry) => entry.currency)).toEqual(['CFB', 'BNB'])
+    // Both blocks project to the slot's usual final weight (350) since neither is fuller yet.
+    expect(ranked[0]?.projected).toBe(350)
+    expect(ranked[0]?.position).toBeCloseTo(0.5)
+    expect(ranked[0]?.earn).toBeCloseTo((850 * 50) / 400)
+    // The BNB block already holds 300 and is projected at its usual 350; same position, less earn.
+    expect(ranked[1]?.projected).toBe(350)
+  })
+
+  it('puts a pool without a day of evidence last', () => {
+    const pools = { ...emptyPools, blocks: [liveBlock('CFB', 10, 850), liveBlock('BNB', 10, 32)] }
+    const histories = { CFB: windowOf('CFB', [100]), BNB: windowOf('BNB', [100, 100, 100, 100, 100, 100]) }
+    expect(assessPools(pools, histories, 1).map((entry) => entry.currency)).toEqual(['BNB', 'CFB'])
   })
 })

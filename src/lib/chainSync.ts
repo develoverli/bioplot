@@ -1,11 +1,12 @@
 import {
-  CURRENCY_TOKENS,
   HISTORY_BLOCKS,
+  blockCurrency,
   blockKey,
   explorerApi,
   findVault,
   readVault,
   settledCloses,
+  tokenFor,
   type MarketBlock,
   type TokenTx,
   type WeightLookup,
@@ -121,7 +122,7 @@ async function readSettledBlock(
   weightOf: WeightLookup,
   signal?: AbortSignal,
 ): Promise<MarketBlock | null> {
-  const token = CURRENCY_TOKENS[currency]
+  const token = tokenFor(currency)
   if (!token) return null
 
   const openSeconds = Date.parse(closeAt) / 1000 - blockTimeSeconds
@@ -156,11 +157,12 @@ export async function syncCurrency(options: SyncOptions, currency: string): Prom
   const fetchJson = options.fetchJson ?? defaultFetchJson
   const window = options.window ?? HISTORY_BLOCKS
 
-  const live = pools.blocks.find((block) => block.currency === currency)
+  const live = pools.blocks.find((block) => blockCurrency(pools, block) === currency)
   const group = pools.groups.find((candidate) => candidate.groupCode === live?.groupCode)
-  if (!live || !group || live.payout <= 0) return []
+  const blockTimeSeconds = group?.blockTimeSeconds ?? 14_400
+  if (!live || live.payout <= 0) return []
 
-  const closes = settledCloses(live.endDate, group.blockTimeSeconds, window)
+  const closes = settledCloses(live.endDate, blockTimeSeconds, window)
   const wanted = new Set(closes.map((closeAt) => blockKey(currency, closeAt)))
 
   const cached = await loadBlocks(currency)
@@ -182,7 +184,7 @@ export async function syncCurrency(options: SyncOptions, currency: string): Prom
         fetchJson,
         currency,
         closeAt,
-        group.blockTimeSeconds,
+        blockTimeSeconds,
         live.payout,
         weightOf,
         signal,

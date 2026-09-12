@@ -155,3 +155,47 @@ describe('buildFeedReport', () => {
     expect(report.biopointsPerDay).toBe(0)
   })
 })
+
+describe('what to feed', () => {
+  const item = (code: string, count: number) => ({
+    itemType: 'farmVegetables',
+    code,
+    rarity: null,
+    name: code,
+    count,
+  })
+
+  it('recommends the feed you can keep making, not the one you merely hold', () => {
+    const report = buildFeedReport(
+      inventory({
+        items: [item('common_corn_seeds', 1), item('epic_cattle_food', 3)],
+      }),
+      catalogue(),
+    )
+    const cow = report.animals[0]!
+    expect(cow.recommended?.code).toBe('common_cattle_food')
+    expect(cow.recommended?.sustainable).toBe(true)
+    // The epic feed is stock from somewhere else: usable, never a plan.
+    expect(cow.stockOnly?.code).toBe('epic_cattle_food')
+    expect(cow.ideal?.productCode).toBe('common_milk')
+  })
+
+  it('names the closest recipe and exactly what it is short of when nothing can be made', () => {
+    const report = buildFeedReport(inventory({ items: [item('common_corn', 1)] }), catalogue())
+    const cow = report.animals[0]!
+    expect(cow.recommended).toBeNull()
+    expect(cow.nearest?.feed.code).toBe('common_cattle_food')
+    expect(cow.nearest?.short).toEqual([
+      expect.objectContaining({ code: 'common_corn', count: 2, owned: 1, hasSeed: false }),
+    ])
+  })
+
+  it('takes a craftable-now feed over none, and says it will not last', () => {
+    const report = buildFeedReport(inventory({ items: [item('common_corn', 4)] }), catalogue())
+    const cow = report.animals[0]!
+    expect(cow.recommended?.code).toBe('common_cattle_food')
+    expect(cow.recommended?.sustainable).toBe(false)
+    expect(cow.recommended?.craftable).toBe(2)
+    expect(cow.recommended?.cannotGrow).toEqual(['Common Corn'])
+  })
+})

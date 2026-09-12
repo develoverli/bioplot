@@ -10,6 +10,7 @@ import { optimize, type Plan, type PlanEntry, type PlotPlan } from '../lib/optim
 import type { Garden, Rarity, Seed } from '../lib/types'
 import { useStore } from '../store'
 import { FarmField } from './FarmField'
+import { FeedAdvice } from './FeedAdvice'
 import { RarityBadge, TabPanel } from './ui'
 import { FarmSummary, PickPlotPlaceholder, WorkspaceShell } from './WorkspaceShell'
 
@@ -22,6 +23,13 @@ const RARITY_VAR: Record<Rarity, string> = {
 }
 
 const RARITY_ORDER: Rarity[] = ['common', 'uncommon', 'rare', 'epic', 'legendary']
+
+/** A plan indexed by the bed it is for. */
+function byBed(source: Plan | null): Map<string, PlotPlan> {
+  const map = new Map<string, PlotPlan>()
+  for (const plotPlan of source?.plots ?? []) map.set(plotPlan.groupId, plotPlan)
+  return map
+}
 
 function LandTabs({
   gardens,
@@ -228,11 +236,17 @@ function FeedRecipe({ choice, best }: { choice: FeedChoice; best: boolean }) {
               <span className={need.owned >= need.count ? 'text-faint' : 'text-[color:var(--danger)]'}>
                 you have {need.owned}
               </span>
-              {need.owned < need.count ? (
-                <span className={need.hasSeed ? 'text-faint' : 'text-[color:var(--danger)]'}>
-                  {need.hasSeed ? `grow it from ${need.seed}` : `missing ${need.seed}`}
-                </span>
-              ) : null}
+              <span
+                className={
+                  need.hasSeed
+                    ? 'text-accent'
+                    : need.owned < need.count
+                      ? 'text-[color:var(--danger)]'
+                      : 'text-[color:var(--warning)]'
+                }
+              >
+                {need.hasSeed ? `seed owned: ${need.seed}` : `no seed: ${need.seed}`}
+              </span>
             </li>
           ))}
         </ul>
@@ -343,11 +357,9 @@ function SelectedAnimal({ bedId }: { bedId: string }) {
           Growing <span className="font-medium">{animal.feeding.replace(/_/g, ' ')}</span> right
           now. Wait for it before feeding again.
         </p>
-      ) : animal.best ? null : (
-        <p className="mt-2.5 text-sm text-[color:var(--warning)]">
-          Nothing to feed this animal with yet.
-        </p>
-      )}
+      ) : null}
+
+      <FeedAdvice animal={animal} />
 
       <FeedLadder animal={animal} />
     </div>
@@ -597,20 +609,19 @@ export function FarmWorkspace({
   )
 
   const gain = lampPlan ? lampPlan.bestBiopoints - lampPlan.currentBiopoints : 0
+  // Whether moving a lamp is worth anything. The ideal view exists either way: even with the
+  // lamps already right, it is the one where every pen runs the best feed you can make.
   const canImprove = gain > 1 && (lampPlan?.moved ?? 0) > 0
 
-  const ideal = canImprove && showIdealLayout && Boolean(idealGarden && idealPlan)
+  const ideal = showIdealLayout && Boolean(idealGarden && idealPlan)
   const garden = ideal && idealGarden ? idealGarden : live
-  const shownPlan = ideal && idealPlan ? idealPlan : plan
 
-  // In the ideal view the animals run their best sustainable feed too.
+  // In the ideal view the animals run the best feed you can actually make.
   const animalDay = ideal ? feedReport.idealBiopointsPerDay : feedReport.biopointsPerDay
 
-  const planByBed = useMemo(() => {
-    const map = new Map<string, PlotPlan>()
-    for (const plotPlan of shownPlan.plots) map.set(plotPlan.groupId, plotPlan)
-    return map
-  }, [shownPlan])
+  const planNow = useMemo(() => byBed(plan), [plan])
+  const planIdeal = useMemo(() => byBed(idealPlan), [idealPlan])
+  const planByBed = ideal ? planIdeal : planNow
 
   /**
    * Only the plots that GAIN a lamp.
@@ -632,12 +643,23 @@ export function FarmWorkspace({
     )
   }, [live, lampPlan])
 
-  if (!garden) return null
+  if (!garden || !live) return null
 
   const total = garden.beds.reduce(
     (sum, bed) => sum + (planByBed.get(bed.id)?.biopointsPerPlot ?? 0),
     0,
   )
+  // Both views, always: the page never shows one number without the other beside it.
+  const nowPerDay =
+    live.beds.reduce((sum, bed) => sum + (planNow.get(bed.id)?.biopointsPerPlot ?? 0), 0) +
+    feedReport.biopointsPerDay
+  const idealPerDay =
+    idealGarden && idealPlan
+      ? idealGarden.beds.reduce(
+          (sum, bed) => sum + (planIdeal.get(bed.id)?.biopointsPerPlot ?? 0),
+          0,
+        ) + feedReport.idealBiopointsPerDay
+      : nowPerDay
   const totalLucky = garden.beds.reduce(
     (sum, bed) => sum + (planByBed.get(bed.id)?.biopointsLucky ?? 0),
     0,
@@ -684,8 +706,8 @@ export function FarmWorkspace({
             plots={soil.length}
             animals={animals.length}
             lamps={garden.devices.length}
-            biopointsPerDay={total + animalDay}
-            idealGain={canImprove ? gain : 0}
+            biopointsPerDay={ideal ? idealPerDay : nowPerDay}
+            otherPerDay={ideal ? nowPerDay : idealPerDay}
             ideal={ideal}
             liveNumbers={liveNumbers}
             horizonHours={horizonHours}
@@ -714,7 +736,7 @@ export function FarmWorkspace({
               }}
             />
 
-            {canImprove ? (
+            {idealGarden && idealPlan ? (
               <button
                 type="button"
                 role="switch"
@@ -737,8 +759,10 @@ export function FarmWorkspace({
                   {ideal ? <Check size={9} strokeWidth={3.5} /> : null}
                 </span>
                 <Lightbulb size={13} aria-hidden="true" />
-                Ideal lamps
-                <span className="tabular font-medium opacity-80">+{formatBiopoints(gain)}</span>
+                Ideal
+                {canImprove ? (
+                  <span className="tabular font-medium opacity-80">+{formatBiopoints(gain)}</span>
+                ) : null}
               </button>
             ) : null}
           </div>
@@ -769,28 +793,37 @@ export function FarmWorkspace({
               stale={stale}
             />
 
-            {canImprove ? (
-              <p className="mt-2 text-xs text-muted">
-                {ideal ? (
+            <p className="mt-2 text-xs text-muted">
+              {ideal ? (
+                canImprove ? (
                   <>
                     Lamps shown where they should be. Dashed plots are the ones to move a lamp
                     onto:{' '}
                     <span className="tabular font-semibold text-accent">
                       +{formatBiopoints(gain)}
                     </span>{' '}
-                    bp / day. Nothing is changed in your game.
+                    bp / day. Pens run the best feed you can make. Nothing is changed in your game.
                   </>
                 ) : (
                   <>
-                    Your lamps as they are. Moving {lampPlan?.placements.length} of them is worth{' '}
-                    <span className="tabular font-semibold text-accent">
-                      +{formatBiopoints(gain)}
-                    </span>{' '}
-                    bp / day.
+                    Your lamps are already where they should be. Pens run the best feed you can
+                    make; switch to Now for what is actually growing.
                   </>
-                )}
-              </p>
-            ) : null}
+                )
+              ) : canImprove ? (
+                <>
+                  Your farm as it is. Moving {lampPlan?.placements.length} lamp
+                  {lampPlan?.placements.length === 1 ? '' : 's'} and feeding every pen its best is
+                  worth{' '}
+                  <span className="tabular font-semibold text-accent">
+                    +{formatBiopoints(Math.max(0, idealPerDay - nowPerDay))}
+                  </span>{' '}
+                  bp / day.
+                </>
+              ) : (
+                <>Your farm as it is, with what is growing right now.</>
+              )}
+            </p>
 
             {hungry > 0 ? (
               <p className="mt-2 text-xs text-[color:var(--warning)]">

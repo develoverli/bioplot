@@ -1,6 +1,6 @@
 import animalsJson from '../../data/animals.json'
 import { seeds } from './catalog'
-import type { Catalogue, PoolBlock, Rarity } from './types'
+import type { Catalogue, InventoryItem, PoolBlock, Pools, Rarity } from './types'
 import { RARITIES } from './types'
 
 /**
@@ -22,6 +22,32 @@ export const CURRENCY_TOKENS: Record<string, { address: string; decimals: number
   CFB: { address: '0xeB811E3ee5e5372CBE93397770a8256E10969024', decimals: 9 },
   BNB: { address: '0x61091c8a8127a1EeD0ddACfDdb83Ae62D9f17feB', decimals: 9 },
   POL: { address: '0x2d1B7E31CB3631227Ab0DE7a6677e43782957717', decimals: 9 },
+}
+
+/** The game's spelling of a currency, mapped to the token table. POL is paid as MATIC. */
+export function currencyKey(currency: string): string | null {
+  const upper = currency.trim().toUpperCase()
+  const key = upper === 'MATIC' ? 'POL' : upper
+  return key in CURRENCY_TOKENS ? key : null
+}
+
+export function tokenFor(currency: string): { address: string; decimals: number } | null {
+  const key = currencyKey(currency)
+  return key ? (CURRENCY_TOKENS[key] ?? null) : null
+}
+
+/**
+ * The currency a live block pays in, wherever the capture happens to say it.
+ *
+ * The block row carries it when the game includes it; otherwise the pool group does, and as
+ * a last resort the group code spells it ("farmCFB"). Empty when none of them do.
+ */
+export function blockCurrency(pools: Pools, block: PoolBlock): string {
+  if (block.currency.trim()) return block.currency.trim().toUpperCase()
+  const group = pools.groups.find((candidate) => candidate.groupCode === block.groupCode)
+  if (group?.currency.trim()) return group.currency.trim().toUpperCase()
+  const match = /(CFB|BNB|POL|MATIC)/i.exec(`${block.groupCode} ${block.code}`)
+  return match?.[1]?.toUpperCase() ?? ''
 }
 
 /** How many settled blocks per currency the history keeps. Six blocks is a day. */
@@ -65,6 +91,13 @@ export function blockKey(currency: string, closeAt: string): string {
 }
 
 export type WeightLookup = (tokenName: string) => number | null
+
+export interface WeightLookups {
+  /** By the chain's token name: "Common Peacock Feather". */
+  byTokenName: WeightLookup
+  /** By the game's item code: "common_peacock_feather". */
+  byCode: (code: string) => number | null
+}
 
 const RARITY_SET: ReadonlySet<string> = new Set(RARITIES)
 
@@ -115,6 +148,10 @@ interface AnimalsDocs {
  * marked incomplete rather than rounded.
  */
 export function buildWeightLookup(catalogue: Catalogue): WeightLookup {
+  return buildWeightLookups(catalogue).byTokenName
+}
+
+export function buildWeightLookups(catalogue: Catalogue): WeightLookups {
   const live = new Map<string, number>()
   for (const entry of catalogue.vegetables) {
     if (entry.biopoints !== null && entry.biopoints > 0) {
@@ -137,16 +174,65 @@ export function buildWeightLookup(catalogue: Catalogue): WeightLookup {
     }
   }
 
+  const lookup = (key: string): number | null =>
+    key ? (live.get(key) ?? docs.get(key) ?? null) : null
+
   const cache = new Map<string, number | null>()
-  return (tokenName) => {
+  const byTokenName: WeightLookup = (tokenName) => {
     const hit = cache.get(tokenName)
     if (hit !== undefined) return hit
     const split = splitTokenName(tokenName)
-    const key = split ? `${split.rarity}${compactKey(split.rest)}` : ''
-    const weight = key ? (live.get(key) ?? docs.get(key) ?? null) : null
+    const weight = lookup(split ? `${split.rarity}${compactKey(split.rest)}` : '')
     cache.set(tokenName, weight)
     return weight
   }
+
+  const byCode = (code: string): number | null => {
+    const head = code.split('_')[0] ?? ''
+    return RARITY_SET.has(head) ? lookup(compactKey(code)) : null
+  }
+
+  return { byTokenName, byCode }
+}
+
+/**
+ * The harvest sitting in the bag, in biopoints: what a player could send to a pool right now.
+ *
+ * Only produce counts (`farmVegetables`); seeds, feed and fertilizer cannot be contributed.
+ * Produce the catalogue cannot weigh is left out and named, never estimated.
+ */
+export function harvestWeight(
+  items: InventoryItem[],
+  weightOfCode: WeightLookups['byCode'],
+): { weight: number; unknown: string[] } {
+  let weight = 0
+  const unknown = new Set<string>()
+  for (const item of items) {
+    if (item.itemType !== 'farmVegetables' || item.count <= 0) continue
+    const each = weightOfCode(item.code)
+    if (each === null) unknown.add(item.name || item.code)
+    else weight += each * item.count
+  }
+  return { weight, unknown: [...unknown].sort() }
+}
+
+/**
+ * What a contribution of `weight` biopoints would earn, in raw currency units.
+ *
+ * A block pays `payout × yours / total`, and the total at close is not known until the close.
+ * For the live block the best estimate is the larger of what is already in it and what this
+ * closing hour usually ends at; for another slot it is that slot's usual final weight. The
+ * contribution itself is added to the total, so a big harvest does not pretend to be free.
+ */
+export function estimateEarnings(
+  payoutRaw: number,
+  weight: number,
+  usualFinalWeight: number,
+  liveWeight = 0,
+): number {
+  if (weight <= 0 || payoutRaw <= 0) return 0
+  const total = Math.max(liveWeight, usualFinalWeight) + weight
+  return total > 0 ? (payoutRaw * weight) / total : 0
 }
 
 /**
@@ -172,7 +258,7 @@ export function readVault(
   currency: string,
   weightOf: WeightLookup,
 ): MarketBlock {
-  const token = CURRENCY_TOKENS[currency]?.address.toLowerCase() ?? ''
+  const token = tokenFor(currency)?.address.toLowerCase() ?? ''
   const me = vault.toLowerCase()
 
   let payout = 0
@@ -371,7 +457,7 @@ export function settledCloses(
 
 /** Currency per million biopoints, the scale at which the numbers stop being dust. */
 export function perMillion(rate: number, currency: string): number {
-  const decimals = CURRENCY_TOKENS[currency]?.decimals ?? 9
+  const decimals = tokenFor(currency)?.decimals ?? 9
   return (rate / 10 ** decimals) * 1_000_000
 }
 
@@ -384,4 +470,76 @@ export const explorerApi = {
   addressTransfers: (address: string, page: number) =>
     `${EXPLORER}/api?module=account&action=tokentx&address=${address}&page=${page}&offset=10000&sort=asc`,
   addressPage: (address: string) => `${EXPLORER}/address/${address}`,
+}
+
+/** Send in the last minutes: the block's weight is then known and nobody can pile in after you. */
+export const SEND_WINDOW_MS = 5 * 60_000
+
+export interface PoolAssessment {
+  currency: string
+  live: PoolBlock
+  history: MarketHistory
+  /** The slot this block closes in, when the window has it. */
+  slot: SlotStat | null
+  /** What the block is expected to end at: the larger of what is in it and the slot's usual. */
+  projected: number
+  /** Final weights over the window, for "where does this block sit". */
+  low: number
+  high: number
+  /** 0 at the window's lightest block, 1 at its heaviest. Lower is better for you. */
+  position: number
+  /** projected / the slot's usual final weight. Below 1 is quieter than usual. */
+  crowd: number
+  /** Raw currency units the bag would earn here. */
+  earn: number
+  /** Enough settled blocks to say anything. */
+  ready: boolean
+}
+
+/**
+ * Which pool to send the harvest to, right now.
+ *
+ * A player can contribute to any of the three pools of their tier, and each one pays a fixed
+ * amount split by weight. The pool worth sending to is the one whose block is lightest
+ * against its own history: currencies are not compared with each other in value, because the
+ * app has no prices and will not invent them. The ranking is by where the projected final
+ * weight sits between the window's lightest and heaviest block, then by the closing hour's
+ * index; the earnings are shown per currency and left for the player to weigh.
+ */
+export function assessPools(
+  pools: Pools,
+  histories: Record<string, MarketHistory>,
+  bagWeight: number,
+): PoolAssessment[] {
+  const out: PoolAssessment[] = []
+  for (const live of pools.blocks) {
+    const currency = blockCurrency(pools, live)
+    const history = histories[currency]
+    if (!history || !tokenFor(currency)) continue
+    const hour = new Date(live.endDate).getHours()
+    const slot = history.slots.find((candidate) => candidate.hour === hour) ?? null
+    const rated = history.blocks.filter((block) => rateOfBlock(block) > 0)
+    const weights = rated.map((block) => block.totalWeight)
+    const low = weights.length > 0 ? Math.min(...weights) : 0
+    const high = weights.length > 0 ? Math.max(...weights) : 0
+    const usual = slot?.weight ?? (weights.length > 0 ? weights.reduce((a, b) => a + b, 0) / weights.length : 0)
+    const projected = Math.max(live.totalWeight, usual)
+    out.push({
+      currency,
+      live,
+      history,
+      slot,
+      projected,
+      low,
+      high,
+      position: high > low ? Math.min(1, Math.max(0, (projected - low) / (high - low))) : 0,
+      crowd: usual > 0 ? projected / usual : 0,
+      earn: estimateEarnings(live.payout, bagWeight, usual, live.totalWeight),
+      ready: history.complete >= 6,
+    })
+  }
+  return out.sort((a, b) => {
+    if (a.ready !== b.ready) return a.ready ? -1 : 1
+    return a.position - b.position || b.earn - a.earn
+  })
 }

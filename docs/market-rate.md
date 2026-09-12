@@ -64,6 +64,27 @@ Blocks close at the same six local hours every day, so the window is summarised 
 hour. The live block's verdict compares its closing hour with the others and checks whether
 the block is already fuller than that hour normally ends.
 
+## The recommendation
+
+A player can send their harvest to any of their tier's three pools, so the question is not
+"is this pool good" but "which pool, and when". The app:
+
+1. Weighs the produce in the bag with the same crop weights (`harvestWeight`).
+2. For each pool's live block, projects its final weight as the larger of what it already
+   holds and what this closing hour usually ends at, then places that between the window's
+   lightest and heaviest settled block (`assessPools`). 0% is the lightest block ever seen,
+   100% the heaviest; lower is better.
+3. Ranks the pools by that position. Currencies are **not** compared with each other in value:
+   the app has no prices and will not invent them. The estimated earnings in each currency are
+   shown so the player can weigh them.
+4. Estimates earnings as `payout × bag / (projected + bag)`: the bag is added to the block, so a
+   large contribution does not pretend to be free.
+5. Tells the player to send in the last five minutes before the close. Share is by weight, not
+   by time, so waiting costs nothing and buys certainty: the block's weight is then known and
+   nobody can pile in afterwards.
+
+A pool with fewer than six settled blocks (a day) is listed but never recommended.
+
 ## Window, cost, refresh
 
 - The app keeps the last **50 settled blocks per currency** for your tier (about eight days).

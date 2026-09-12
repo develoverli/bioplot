@@ -53,7 +53,7 @@ export function FarmSummary({
   animals,
   lamps,
   biopointsPerDay,
-  idealGain = 0,
+  otherPerDay = null,
   ideal = false,
   liveNumbers,
   horizonHours,
@@ -63,9 +63,10 @@ export function FarmSummary({
   plots: number
   animals: number
   lamps: number
-  /** Null while there is nothing to plan. */
+  /** The view being shown. Null while there is nothing to plan. */
   biopointsPerDay: number | null
-  idealGain?: number
+  /** The other view (Now under Ideal, Ideal under Now), so both are always on the page. */
+  otherPerDay?: number | null
   ideal?: boolean
   liveNumbers: boolean
   horizonHours: number
@@ -104,10 +105,17 @@ export function FarmSummary({
             <span className="text-xs text-muted">bp / day</span>
           </p>
         )}
-        {idealGain > 1 ? (
-          <p className="tabular mt-1 text-xs text-muted">
-            {ideal ? 'Includes' : 'Ideal lamps add'}{' '}
-            <span className="font-semibold text-accent">+{formatBiopoints(idealGain)}</span>
+        {otherPerDay !== null && biopointsPerDay !== null ? (
+          <p className="tabular mt-1 text-xs text-muted" title={formatExact(otherPerDay)}>
+            {ideal ? 'Now' : 'Ideal'}{' '}
+            <span className="font-semibold text-ink">{formatBiopoints(otherPerDay)}</span>
+            {otherPerDay !== biopointsPerDay ? (
+              <span className="text-faint">
+                {' '}
+                ({biopointsPerDay > otherPerDay ? '+' : '-'}
+                {formatBiopoints(Math.abs(biopointsPerDay - otherPerDay))})
+              </span>
+            ) : null}
           </p>
         ) : null}
       </div>
