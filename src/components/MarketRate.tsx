@@ -13,6 +13,7 @@ import {
   harvestWeight,
   rateOfBlock,
   tokenFor,
+  unknownShare,
   type MarketBlock,
   type MarketHistory,
   type PoolAssessment,
@@ -140,10 +141,12 @@ function Recommendation({
       </p>
 
       <p className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-ink">
-        <Clock size={13} aria-hidden="true" className={sendNow ? 'text-accent' : 'text-muted'} />
-        {sendNow
-          ? `Send now: the block closes at ${closeLabel}, in ${formatDuration(left / 1000)}.`
-          : `Wait: closes at ${closeLabel}, in ${formatDuration(left / 1000)}. Send in the last ${SEND_WINDOW_MS / 60_000} minutes, when the weight is known and nobody can pile in after you.`}
+        <Clock size={13} aria-hidden="true" className={sendNow && left > 0 ? 'text-accent' : 'text-muted'} />
+        {left === 0
+          ? `This block closed at ${closeLabel}. Your capture is from before that: sync the extension to read the block that is open now.`
+          : sendNow
+            ? `Send now: the block closes at ${closeLabel}, in ${formatDuration(left / 1000)}.`
+            : `Wait: closes at ${closeLabel}, in ${formatDuration(left / 1000)}. Send in the last ${SEND_WINDOW_MS / 60_000} minutes, when the weight is known and nobody can pile in after you.`}
       </p>
 
       {ranked.length > 1 ? (
@@ -208,11 +211,13 @@ function WeightTable({ ranked, now, rows }: { ranked: PoolAssessment[]; now: num
         <tbody className="divide-y divide-[color:var(--border)]">
           <tr className="bg-accent-dim/60">
             <td className="tabular py-1.5 pr-3 text-ink">
-              <span className="font-semibold">Now</span>
+              <span className="font-semibold">{closesIn(liveEnd, now) > 0 ? 'Now' : 'Captured'}</span>
               <span className="text-xs text-muted">
                 {' '}
-                · {liveEnd ? timeFormat.format(new Date(liveEnd)) : ''} · in{' '}
-                {formatDuration(closesIn(liveEnd, now) / 1000)}
+                · {liveEnd ? timeFormat.format(new Date(liveEnd)) : ''}
+                {closesIn(liveEnd, now) > 0
+                  ? ` · in ${formatDuration(closesIn(liveEnd, now) / 1000)}`
+                  : ' · closed, sync again'}
               </span>
             </td>
             {currencies.map((currency) => {
@@ -244,6 +249,7 @@ function WeightTable({ ranked, now, rows }: { ranked: PoolAssessment[]; now: num
                   )
                 }
                 const rated = rateOfBlock(block) > 0
+                const share = unknownShare(block)
                 const isLow = rated && block.totalWeight === lows.get(currency)
                 return (
                   <td
@@ -253,10 +259,13 @@ function WeightTable({ ranked, now, rows }: { ranked: PoolAssessment[]; now: num
                     }`}
                     title={
                       rated
-                        ? `${formatExact(block.totalWeight)} · ${formatRate(rateOfBlock(block), currency)} per 1M bp`
-                        : `incomplete: ${block.unknown.length} crop kinds unweighed`
+                        ? `${formatExact(block.totalWeight)} · ${formatRate(rateOfBlock(block), currency)} per 1M bp${
+                            share > 0 ? ` · ${(share * 100).toFixed(1)}% of units unweighed: ${block.unknown.join(', ')}` : ''
+                          }`
+                        : `not rated: ${(share * 100).toFixed(0)}% of units unweighed (${block.unknown.join(', ')})`
                     }
                   >
+                    {share > 0 ? '≈' : ''}
                     {formatBiopoints(block.totalWeight)}
                     {!rated ? '*' : ''}
                   </td>
@@ -268,8 +277,10 @@ function WeightTable({ ranked, now, rows }: { ranked: PoolAssessment[]; now: num
       </table>
       <p className="mt-1.5 text-xs text-faint">
         Weight is total biopoints contributed by everyone in your tier. Green is the window's
-        lightest block, the best a biopoint did. The arrow is the expected end of the live block. *
-        means a crop in that block could not be weighed, so the number is a floor.
+        lightest block, the best a biopoint did. The arrow is the expected end of the live block. ≈
+        means a few percent of that block's units could not be weighed (hover for which); * means
+        too many were, so the block is shown but not rated. Sync with the farm open to capture the
+        catalogue and weigh them.
       </p>
     </div>
   )

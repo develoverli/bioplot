@@ -57,8 +57,11 @@ index        = rate / mean rate of the window (1.00 is average)
 
 The weight of a crop is `rewardPoolBaseWeight` from the captured catalogue when you have
 synced, and the docs' biopoint table otherwise. A crop token that matches neither is **not
-guessed**: the block is listed as incomplete, its total is shown as a floor, and it is left
-out of every average.
+guessed**: its units are counted but not weighed, the block's total is a floor, and the block
+shows which kinds are missing. A block is still rated while the unweighed part is at most
+10% of its units (shown as `≈`); past that it is listed but left out of every average (`*`).
+The docs alone leave 4–7% of a block unweighed (event crops); a captured catalogue brings
+the totals to within a fraction of a percent of the game's own figures.
 
 Blocks close at the same six local hours every day, so the window is summarised per closing
 hour. The live block's verdict compares its closing hour with the others and checks whether

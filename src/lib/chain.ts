@@ -26,7 +26,8 @@ export const CURRENCY_TOKENS: Record<string, { address: string; decimals: number
 
 /** The game's spelling of a currency, mapped to the token table. POL is paid as MATIC. */
 export function currencyKey(currency: string): string | null {
-  const upper = currency.trim().toUpperCase()
+  // The game says "IMATIC" and "IBNB" for its internal balances of the same coins.
+  const upper = currency.trim().toUpperCase().replace(/^I(?=(MATIC|BNB|POL|CFB)$)/, '')
   const key = upper === 'MATIC' ? 'POL' : upper
   return key in CURRENCY_TOKENS ? key : null
 }
@@ -84,6 +85,26 @@ export interface MarketBlock {
   payees: number
   /** Crop tokens with no known weight. A non-empty list makes `totalWeight` a floor. */
   unknown: string[]
+  /** Units received in total, and the part of them that could not be weighed. */
+  units?: number
+  unknownUnits?: number
+}
+
+/**
+ * How much of a block may be unweighed and still be rated.
+ *
+ * A block is a floor whenever one crop kind is unknown, but a floor that is within a few
+ * percent of the truth is still a rate worth ranking by; a block missing a tenth of its units
+ * is not. The share is by units, which is what the chain reports; the app marks such a block
+ * "≈" and names the kinds so a sync with the farm open can weigh them properly.
+ */
+export const UNKNOWN_UNITS_LIMIT = 0.1
+
+/** The share of a block's units that could not be weighed. Cached blocks without counts are treated as fully known only when nothing was unknown. */
+export function unknownShare(block: MarketBlock): number {
+  if (block.unknown.length === 0) return 0
+  if (block.units === undefined || block.unknownUnits === undefined || block.units <= 0) return 1
+  return block.unknownUnits / block.units
 }
 
 export function blockKey(currency: string, closeAt: string): string {
@@ -265,6 +286,8 @@ export function readVault(
   let openAt = ''
   let totalWeight = 0
   let contributions = 0
+  let units = 0
+  let unknownUnits = 0
   const contributors = new Set<string>()
   const unknown = new Set<string>()
   let payees = 0
@@ -284,9 +307,13 @@ export function readVault(
       contributions += 1
       contributors.add(row.from.toLowerCase())
       lastIn = Math.max(lastIn, at)
+      const count = Number(row.value)
+      units += count
       const weight = weightOf(row.tokenName)
-      if (weight === null) unknown.add(row.tokenName)
-      else totalWeight += weight * Number(row.value)
+      if (weight === null) {
+        unknown.add(row.tokenName)
+        unknownUnits += count
+      } else totalWeight += weight * count
       continue
     }
 
@@ -312,12 +339,14 @@ export function readVault(
     contributors: contributors.size,
     payees,
     unknown: [...unknown].sort(),
+    units,
+    unknownUnits,
   }
 }
 
 /** Currency per biopoint. Zero when the block cannot be rated. */
 export function rateOfBlock(block: MarketBlock): number {
-  if (block.totalWeight <= 0 || block.unknown.length > 0) return 0
+  if (block.totalWeight <= 0 || unknownShare(block) > UNKNOWN_UNITS_LIMIT) return 0
   return block.payout / block.totalWeight
 }
 
@@ -590,15 +619,20 @@ export function isSnapshot(value: unknown): value is Snapshot {
 export function weighUnits(
   units: Record<string, number>,
   weightOf: WeightLookup,
-): { totalWeight: number; unknown: string[] } {
+): { totalWeight: number; unknown: string[]; units: number; unknownUnits: number } {
   let totalWeight = 0
+  let total = 0
+  let unknownUnits = 0
   const unknown: string[] = []
   for (const [name, count] of Object.entries(units)) {
+    total += count
     const weight = weightOf(name)
-    if (weight === null) unknown.push(name)
-    else totalWeight += weight * count
+    if (weight === null) {
+      unknown.push(name)
+      unknownUnits += count
+    } else totalWeight += weight * count
   }
-  return { totalWeight, unknown: unknown.sort() }
+  return { totalWeight, unknown: unknown.sort(), units: total, unknownUnits }
 }
 
 /**
@@ -650,6 +684,8 @@ export function blocksFromSnapshot(
       contributors: vault.contributors,
       payees: vault.payees,
       unknown: weighed.unknown,
+      units: weighed.units,
+      unknownUnits: weighed.unknownUnits,
     })
   }
   return out

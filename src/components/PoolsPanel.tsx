@@ -32,7 +32,7 @@ function remaining(endDate: string): string {
   const end = Date.parse(endDate)
   if (Number.isNaN(end)) return '—'
   const left = Math.max(0, Math.round((end - Date.now()) / 1000))
-  return left === 0 ? 'closing' : formatDuration(left)
+  return left === 0 ? 'closed · sync again' : formatDuration(left)
 }
 
 /**
@@ -162,7 +162,7 @@ export function PoolsPanel({ bare = false }: { bare?: boolean }) {
                 </span>
 
                 <span className="tabular ml-auto text-xs text-faint">
-                  closes in {remaining(block.endDate)}
+                  {remaining(block.endDate).startsWith('closed') ? remaining(block.endDate) : `closes in ${remaining(block.endDate)}`}
                 </span>
 
                 {block.explorerURL ? (

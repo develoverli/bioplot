@@ -7,7 +7,9 @@ import {
   buildMarketHistory,
   buildWeightLookup,
   buildWeightLookups,
+  currencyKey,
   estimateEarnings,
+  rateOfBlock,
   findVault,
   harvestWeight,
   judgeLiveBlock,
@@ -115,6 +117,22 @@ describe('readVault', () => {
     const block = readVault(rows, VAULT, 'CFB', () => null)
     expect(block.unknown).toEqual(['Common Moon Rock'])
     expect(block.totalWeight).toBe(0)
+    expect(block.unknownUnits).toBe(5)
+    expect(rateOfBlock(block)).toBe(0)
+  })
+
+  it('still rates a block whose unweighed part is a few percent of its units', () => {
+    const weightOf = (name: string) => (name === 'Common Strawberry' ? 10 : null)
+    const rows = [
+      tx({ contractAddress: CFB, value: '850000000000' }),
+      tx({ from: '0xa', value: '95' }),
+      tx({ from: '0xb', value: '5', tokenName: 'Common Moon Rock' }),
+    ]
+    const block = readVault(rows, VAULT, 'CFB', weightOf)
+    expect(block.unknown).toEqual(['Common Moon Rock'])
+    expect(rateOfBlock(block)).toBeCloseTo(850_000_000_000 / 950)
+    const worse = readVault([...rows, tx({ from: '0xc', value: '20', tokenName: 'Common Moon Rock' })], VAULT, 'CFB', weightOf)
+    expect(rateOfBlock(worse)).toBe(0)
   })
 })
 
@@ -217,6 +235,16 @@ describe('settledCloses', () => {
   it('waits for the grace period before counting a fresh close', () => {
     const now = Date.parse('2026-09-12T08:50:00Z')
     expect(settledCloses('2026-09-12T12:49:18Z', 14_400, 1, now)).toEqual(['2026-09-12T04:49:18.000Z'])
+  })
+})
+
+describe('currencyKey', () => {
+  it('maps the game\'s own spellings onto the token table', () => {
+    expect(currencyKey('IMATIC')).toBe('POL')
+    expect(currencyKey('IBNB')).toBe('BNB')
+    expect(currencyKey('cfb')).toBe('CFB')
+    expect(currencyKey('MATIC')).toBe('POL')
+    expect(currencyKey('GOLD')).toBeNull()
   })
 })
 

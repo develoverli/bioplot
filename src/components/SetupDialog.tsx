@@ -81,7 +81,8 @@ export function SetupDialog({ open, onClose }: { open: boolean; onClose: () => v
   const sync = useCallback(async () => {
     setStatus({ kind: 'working' })
     try {
-      apply(await requestInventory())
+      // A sync that brought a farm in is done: the page behind the dialog is the result.
+      if (apply(await requestInventory())) onClose()
     } catch (error) {
       setStatus({
         kind: 'error',
@@ -91,7 +92,7 @@ export function SetupDialog({ open, onClose }: { open: boolean; onClose: () => v
             : 'Could not reach the extension. Is it installed and enabled?',
       })
     }
-  }, [apply])
+  }, [apply, onClose])
 
   const exportInventory = useCallback(() => {
     const blob = new Blob([JSON.stringify(inventory, null, 2)], { type: 'application/json' })

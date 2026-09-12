@@ -66,7 +66,8 @@ transfer per contributor about ninety seconds after close. The live block's
 block from public data, which is what `src/lib/chain.ts` does; endpoints, costs and limits are
 in `docs/market-rate.md`.
 
-Currency tokens (9 decimals): CFB `0xeB811E3ee5e5372CBE93397770a8256E10969024`,
+The game spells its internal balances `IMATIC` and `IBNB` in `active-blocks-data`; the
+tokens are the same. Currency tokens (9 decimals): CFB `0xeB811E3ee5e5372CBE93397770a8256E10969024`,
 BNB `0x61091c8a8127a1EeD0ddACfDdb83Ae62D9f17feB`, POL as MATIC
 `0x2d1B7E31CB3631227Ab0DE7a6677e43782957717`. Blockscout v1 `tokentx` returns a whole vault in
 one call with `offset=10000` (~2,900 rows, ~20 s); `getblocknobytime` maps a close time to a
