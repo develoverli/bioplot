@@ -1,10 +1,10 @@
 /**
  * Where the published app lives. Set this before submitting to the store.
  *
- * With an address the primary button opens the app, and the privacy and terms links point at
- * the pages it serves. Left empty, the primary button copies the capture instead and the links
- * stay hidden, because a dead link is worse than no link at all. The store listing carries the
- * policy URL either way, and that is the copy the reviewer reads.
+ * With an address the popup shows an "Open Bioplot" button, and the privacy and terms links
+ * point at the pages it serves. Left empty, all three stay hidden, because a dead link is worse
+ * than no link at all. The store listing carries the policy URL either way, and that is the
+ * copy the reviewer reads.
  */
 const SITE_URL = ''
 
@@ -54,7 +54,7 @@ function describe() {
   return {
     tone: 'ok',
     text: 'Farm captured',
-    hint: site ? 'Open Bioplot and press Sync now.' : 'Open Bioplot and press Sync now, or copy the capture for another browser.',
+    hint: 'Open Bioplot and press Sync now.',
   }
 }
 
@@ -78,8 +78,6 @@ function render() {
   const hasAnything = captures.length > 0 || Object.keys(seen).length > 0
   const hasFarm = Boolean(payload) && (payload.seeds.length > 0 || payload.plots.length > 0)
 
-  // Copy is only useful once there is something to copy; opening the app is always useful.
-  el('primary').disabled = site ? false : !hasFarm
   el('copy').disabled = !hasFarm
   el('copyDiag').disabled = !hasAnything
   el('copyRaw').disabled = captures.length === 0
@@ -112,7 +110,6 @@ load()
 
 el('primary').addEventListener('click', () => {
   if (site) chrome.tabs.create({ url: site })
-  else copyCapture()
 })
 
 el('copy').addEventListener('click', copyCapture)
@@ -135,11 +132,9 @@ el('clear').addEventListener('click', () => {
   })
 })
 
-// The primary action and the policy links depend on the app having an address.
+// The open button and the policy links depend on the app having an address.
 if (site) {
-  document.body.classList.add('has-site')
-  el('primaryLabel').textContent = 'Open Bioplot'
-  el('copy').hidden = false
+  el('actions').hidden = false
   el('privacyLink').href = `${site}/privacy.html`
   el('termsLink').href = `${site}/terms.html`
   el('privacyLink').hidden = false
