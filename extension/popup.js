@@ -6,7 +6,7 @@
  * than no link at all. The store listing carries the policy URL either way, and that is the
  * copy the reviewer reads.
  */
-const SITE_URL = ''
+const SITE_URL = 'https://develoverli.github.io/bioplot'
 
 const el = (id) => document.getElementById(id)
 

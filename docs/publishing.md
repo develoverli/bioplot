@@ -31,4 +31,6 @@ Chrome Web Store asks for a justification for every permission. The honest answe
 | Remote code | None. Everything runs from the packaged files. |
 | Data collected | None leaves the device. No account, no backend, no analytics, no telemetry. |
 
-Privacy policy URL for the listing: `https://<domain>/privacy.html`.
+Privacy policy URL for the listing: `https://<domain>/privacy.html`. For the upstream
+deployment that is `https://develoverli.github.io/bioplot/privacy.html`; the manifest and
+`extension/popup.js` already point at that origin.

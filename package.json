@@ -1,6 +1,6 @@
 {
   "name": "bioplot",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "Planner for Chainers Farm: read your seeds, plots and animals, then see exactly what to plant for the most biopoints in 24 hours.",
