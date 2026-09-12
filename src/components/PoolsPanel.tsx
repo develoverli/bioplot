@@ -4,6 +4,7 @@ import { formatBiopoints, formatDuration, formatExact, formatPercent } from '../
 import { buildPoolHistory } from '../lib/pools'
 import type { Pools } from '../lib/types'
 import { useStore } from '../store'
+import { MarketRate } from './MarketRate'
 import { BareFrame, Card } from './ui'
 
 /**
@@ -186,6 +187,10 @@ export function PoolsPanel({ bare = false }: { bare?: boolean }) {
         Payout is your current share of the block if it closed right now. It moves as other
         players contribute, so it is a reading, not a promise.
       </p>
+
+      <div className="mt-4 border-t border-line pt-3">
+        <MarketRate />
+      </div>
 
       {history.count > 0 ? (
         <div className="mt-4 border-t border-line pt-3">

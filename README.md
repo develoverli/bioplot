@@ -37,6 +37,10 @@ and solves the schedule per plot.
   nothing else.
 - **Values your biopoints.** Your share of each live reward pool, what it pays, what past
   blocks paid, and which hours have historically paid most per biopoint.
+- **Tells you when to send the harvest.** Every pool block has a public vault on Chainers
+  Chain; the app reads the last 50 settled blocks of your tier off the explorer, works out what
+  a biopoint earned in each, and calls the live block good, average or one to hold for. The
+  arithmetic, the endpoints and the limits are in [docs/market-rate.md](docs/market-rate.md).
 - **Never invents anything.** No seed you do not own, no feed you cannot craft, no rounding in
   your favour. An unrecognised row is refused and surfaced, not guessed.
 
@@ -51,7 +55,9 @@ chainers.io tab ──▶ Bioplot Farm Reader (extension) ──▶ Bioplot tab
 ```
 
 There is no server. No account, no backend, no analytics, no telemetry. The app is a static
-page; the extension talks only to a Bioplot page open in the same browser.
+page; the extension talks only to a Bioplot page open in the same browser. The one outside
+request the app makes is to the chain's public explorer, for pool history that is public
+anyway; it carries no account data.
 
 ### The extension
 
@@ -107,11 +113,12 @@ pnpm legal          # rebuilds public/privacy.html and public/terms.html from th
 data/            game data (seeds/animals generated, game.json hand-maintained)
 scripts/         python: doc extraction, icons, legal pages (stdlib only)
 src/lib/         types, catalog, yield model, optimizer  ← the actual product
+                 chain.ts reads pool history off the explorer (docs/market-rate.md)
 src/components/  UI
 extension/       MV3 extension (inject → content-game → background → content-app → app)
 public/          favicon and the generated policy pages
 docs/design/     PRODUCT.md and DESIGN.md
-docs/            releasing guide, publishing checklist and store-listing notes
+docs/            releasing guide, publishing checklist, store-listing notes, market-rate.md
 .github/         issue and PR templates; CI, release and Pages workflows
 ```
 

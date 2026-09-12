@@ -39,6 +39,7 @@ blockchain/API probe log. Load it before touching anything under `data/`, `src/l
 data/            game data (seeds/animals generated, game.json hand-maintained)
 scripts/         python extractors that regenerate data/ and the extension lookup table
 src/lib/         types, catalog, yield model, optimizer  ← the actual product
+                 chain.ts / chainSync.ts / chainDb.ts: pool history from the public explorer
 src/components/  UI
 extension/       MV3 extension (inject → content-game → background → content-app → app)
 docs/design/     PRODUCT.md and DESIGN.md
@@ -52,4 +53,8 @@ docs/design/     PRODUCT.md and DESIGN.md
 - Regenerate data with `pnpm data:refresh`; never hand-edit `data/seeds.json`.
 - Anything that plans takes its catalogue as an argument. `data/seeds.json` is the fallback,
   not the source of truth: the game's `rewardPoolBaseWeight` wins when it has been captured.
+- The only outside host the app talks to besides the game's CDN is `explorer.chainers.io`,
+  read-only, with public addresses and block numbers. See `docs/market-rate.md` before
+  touching `src/lib/chain*.ts`; a crop the chain names that the catalogue cannot weigh is
+  reported, never guessed.
 - `pnpm test` and `pnpm build` both pass before anything is considered done.

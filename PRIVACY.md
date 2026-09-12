@@ -1,6 +1,6 @@
 # Privacy policy — Bioplot
 
-Last updated: 2026-09-03
+Last updated: 2026-09-12
 
 **Short version: nothing you do here reaches us, because there is no "us" to reach.**
 The web app is a static page and the extension talks to no server of ours. There is no
@@ -33,9 +33,16 @@ Uninstalling the extension removes its copy. Clearing site data for the app remo
 
 ## Third parties
 
-None. Seed artwork is loaded directly from the game's own CDN (`static.chainers.io`) using the
-URLs the game publishes, which means that CDN sees an ordinary image request from your
-browser. No other external request is made.
+Two, both public and both read-only:
+
+- Seed artwork is loaded directly from the game's own CDN (`static.chainers.io`) using the
+  URLs the game publishes, so that CDN sees an ordinary image request from your browser.
+- Reward-pool history is read from the chain's public block explorer
+  (`explorer.chainers.io`). Those requests name pool vault addresses and block numbers, which
+  are public for everyone; they never include your wallet, your account, or anything from the
+  capture. How this works is written up in `docs/market-rate.md`.
+
+No other external request is made.
 
 ## Changes
 
@@ -48,7 +55,8 @@ You do not have to take this on trust. A browser extension is installed as ordin
 unminified JavaScript: open `chrome://extensions`, turn on Developer mode, and use **Inspect
 views** or **service worker** to read every line of it. The network tab of your own browser
 will show you the same thing from the outside: while Bioplot is open, it makes no request to
-any server we control, because there is none.
+any server we control, because there is none. The only hosts you will see are the game's CDN
+and the chain's public explorer.
 
 ## Contact
 

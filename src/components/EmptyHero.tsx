@@ -1,6 +1,5 @@
 import { Coins, Lightbulb, PawPrint, PlugZap, Sprout } from 'lucide-react'
 import { Button } from './ui'
-import { Logo } from './Logo'
 
 const FEATURES = [
   { Icon: Sprout, title: 'Plan every plot', text: 'The best seed per bed for the next day, from what you own.' },
@@ -29,8 +28,16 @@ export function EmptyHero({
 }) {
   return (
     <div className="rounded-2xl border border-line bg-surface px-5 py-8 text-center shadow-[var(--shadow-2)] sm:px-8">
-      <Logo size={56} className="mx-auto rounded-[0.85rem]" />
-      <h2 className="mt-4 text-xl font-semibold tracking-tight text-ink">Your farm is not loaded yet</h2>
+      {/* Relative path on purpose: the app is served from any base, and a leading slash breaks a sub-path. */}
+      <img
+        src="farm-hero.webp"
+        alt=""
+        width={1040}
+        height={721}
+        decoding="async"
+        className="mx-auto w-full max-w-[22rem]"
+      />
+      <h2 className="mt-2 text-xl font-semibold tracking-tight text-ink">Your farm is not loaded yet</h2>
       <p className="mx-auto mt-1.5 max-w-md text-sm text-muted">
         The extension reads your plots, seeds and animals inside your own browser, and this page
         plans the next {horizonHours} hours from them. Nothing is sent anywhere.

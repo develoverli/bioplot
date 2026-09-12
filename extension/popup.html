@@ -87,7 +87,7 @@
       /* ---- the one line that says whether it is working ---------------------------- */
       #state {
         display: grid;
-        grid-template-columns: 36px 1fr;
+        grid-template-columns: 36px 1fr auto;
         column-gap: 10px;
         align-items: center;
         margin-top: 12px;
@@ -114,6 +114,14 @@
       #state.warn #iconWarn,
       #state.bad #iconBad {
         display: block;
+      }
+      #state img {
+        grid-column: 3;
+        grid-row: 1 / span 3;
+        width: 96px;
+        height: auto;
+        align-self: center;
+        margin-right: -4px;
       }
       #stateText {
         margin: 0;
@@ -469,6 +477,7 @@
       <p id="stateText" role="status">Checking…</p>
       <p id="hint"></p>
       <p id="last" class="tabular"></p>
+      <img src="assets/farm-hero.webp" alt="" width="320" height="222" decoding="async" />
     </section>
 
     <div class="counts">

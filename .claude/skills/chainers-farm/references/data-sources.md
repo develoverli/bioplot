@@ -55,6 +55,23 @@ Token metadata carries the useful traits. A phytolamp instance, for example:
 **There is no seeds contract and no plots contract.** That is the single most important finding:
 a wallet address alone can tell you a player's lamps and croppers, never their seeds or beds.
 
+### Reward pools are on-chain (confirmed 2026-09-12)
+
+Crops, animal products and the three reward currencies are ERC-20 tokens, and every pool
+block has a throwaway **vault** address: funded with the block's payout at open (a mint for
+CFB and POL, a treasury transfer for BNB; four vaults per currency, one per tier, distinct
+amounts), fed by every contribution as a token transfer for four hours, drained by one payout
+transfer per contributor about ninety seconds after close. The live block's
+`explorerBlockURL` is that vault. So `payout / Σ(crop units × weight)` is computable for every
+block from public data, which is what `src/lib/chain.ts` does; endpoints, costs and limits are
+in `docs/market-rate.md`.
+
+Currency tokens (9 decimals): CFB `0xeB811E3ee5e5372CBE93397770a8256E10969024`,
+BNB `0x61091c8a8127a1EeD0ddACfDdb83Ae62D9f17feB`, POL as MATIC
+`0x2d1B7E31CB3631227Ab0DE7a6677e43782957717`. Blockscout v1 `tokentx` returns a whole vault in
+one call with `offset=10000` (~2,900 rows, ~20 s); `getblocknobytime` maps a close time to a
+chain block. The explorer sends `Access-Control-Allow-Origin: *`.
+
 ERC-20 references found in the docs: old $CHU on Polygon mainnet
 `0x24878dfb65693f975d825e157a0685aec2300ad8`, and `0x571E3DEB36B070083E39432061a7947a39AbdeeF`.
 
