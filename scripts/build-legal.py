@@ -117,12 +117,14 @@ def page(title: str, body: str) -> str:
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="dark" />
     <title>{html.escape(title)}</title>
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="icon" type="image/png" sizes="200x200" href="favicon.png" />
+    <link rel="apple-touch-icon" href="favicon.png" />
     <style>{STYLE}    </style>
   </head>
   <body>
     <main>
-      <a class="back" href="/">&larr; Bioplot</a>
+      <a class="back" href="./">&larr; Bioplot</a>
       {body}
     </main>
   </body>
