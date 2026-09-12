@@ -354,4 +354,25 @@ describe('blocksFromSnapshot', () => {
     expect(blocks[0]?.key).toBe('cfb:2026-09-12T08:49:18.000Z')
     expect(blocksFromSnapshot(snapshot, 'CFB', 1, weightOf)).toEqual([])
   })
+
+  it('files a block under the nearest scheduled close, seconds of drift included', () => {
+    const snapshot: Snapshot = {
+      version: 1,
+      updatedAt: null,
+      blockTimeSeconds: 14_400,
+      anchorCloseAt: '2026-09-12T08:49:18.000Z',
+      blocks: [
+        {
+          closeAt: '2026-09-12T08:49:18.000Z',
+          openAt: '2026-09-12T04:49:18.000Z',
+          pools: { CFB: [{ vault: '0xv', payout: '850000000000', paid: '0', contributions: 1, contributors: 1, payees: 1, units: {} }] },
+        },
+      ],
+    }
+    const closes = ['2026-09-12T12:49:07.000Z', '2026-09-12T08:49:07.000Z']
+    const blocks = blocksFromSnapshot(snapshot, 'CFB', 850_000_000_000, () => 1, closes)
+    expect(blocks[0]?.closeAt).toBe('2026-09-12T08:49:07.000Z')
+    // A block an hour off the schedule is not the same block.
+    expect(blocksFromSnapshot(snapshot, 'CFB', 850_000_000_000, () => 1, ['2026-09-12T09:49:18.000Z'])).toEqual([])
+  })
 })

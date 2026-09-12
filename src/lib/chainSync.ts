@@ -193,7 +193,7 @@ export async function syncCurrency(options: SyncOptions, currency: string): Prom
 
   // The shared history wins over the local cache: it is re-weighed with today's catalogue.
   if (options.snapshot) {
-    for (const block of blocksFromSnapshot(options.snapshot, currency, live.payout, weightOf)) {
+    for (const block of blocksFromSnapshot(options.snapshot, currency, live.payout, weightOf, closes)) {
       if (wanted.has(block.key)) {
         have.set(block.key, block)
         options.onBlock?.(block)

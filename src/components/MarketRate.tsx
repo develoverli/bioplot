@@ -478,6 +478,7 @@ export function MarketRate() {
   const [manual, setManual] = useState(0)
   const [now, setNow] = useState(() => Date.now())
   const [snapshotAt, setSnapshotAt] = useState<string | null>(null)
+  const [snapshotBlocks, setSnapshotBlocks] = useState(0)
 
   // The countdown to the close is the one number on this page that moves on its own.
   useEffect(() => {
@@ -500,6 +501,7 @@ export function MarketRate() {
       if (controller.signal.aborted) return
       setBlocks(Object.fromEntries(currencies.map((currency, i) => [currency, cached[i] ?? []])))
       setSnapshotAt(snapshot?.updatedAt ?? null)
+      setSnapshotBlocks(snapshot?.blocks.length ?? 0)
 
       const results = await Promise.allSettled(
         currencies.map((currency) =>
@@ -561,7 +563,7 @@ export function MarketRate() {
       : phase === 'failed'
         ? 'The explorer did not answer for some blocks. What was read is shown; the rest is retried on the next pass.'
         : lastRun !== null
-          ? `Up to date as of ${timeFormat.format(new Date(lastRun))}${nextRun !== null ? ` · next read at ${timeFormat.format(new Date(nextRun))}` : ''}${snapshotAt ? ` · shared history from ${dateTimeFormat.format(new Date(snapshotAt))}` : ' · no shared history on this site, reading the chain directly'}.`
+          ? `Up to date as of ${timeFormat.format(new Date(lastRun))}${nextRun !== null ? ` · next read at ${timeFormat.format(new Date(nextRun))}` : ''}${snapshotAt ? ` · shared history: ${snapshotBlocks} blocks, updated ${dateTimeFormat.format(new Date(snapshotAt))}` : ' · no shared history on this site, reading the chain directly'}.`
           : 'Waiting to start.'
 
   return (

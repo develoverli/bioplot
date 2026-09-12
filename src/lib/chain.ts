@@ -607,26 +607,43 @@ export function weighUnits(
  * The tier is the vault whose payout equals the live block's, the same rule the chain reader
  * uses. Weights are applied here, at read time, so a newer catalogue improves old blocks.
  */
+/** The game's schedule and the chain's timestamps disagree by seconds; this is the slack. */
+const CLOSE_TOLERANCE_MS = 10 * 60_000
+
 export function blocksFromSnapshot(
   snapshot: Snapshot,
   currency: string,
   payoutRaw: number,
   weightOf: WeightLookup,
+  /** The closes the app is keyed on. A snapshot block is filed under the nearest one. */
+  closes: string[] = [],
 ): MarketBlock[] {
   const wanted = String(Math.round(payoutRaw))
   const key = currencyKey(currency)
+  const schedule = closes.map((closeAt) => ({ closeAt, at: Date.parse(closeAt) }))
   const out: MarketBlock[] = []
   for (const block of snapshot.blocks) {
     const vaults = key ? block.pools[key] : undefined
     const vault = vaults?.find((candidate) => candidate.payout === wanted)
     if (!vault) continue
+    const at = Date.parse(block.closeAt)
+    const nearest = schedule.reduce<{ closeAt: string; at: number } | null>(
+      (best, candidate) =>
+        Math.abs(candidate.at - at) <= CLOSE_TOLERANCE_MS &&
+        (!best || Math.abs(candidate.at - at) < Math.abs(best.at - at))
+          ? candidate
+          : best,
+      null,
+    )
+    if (schedule.length > 0 && !nearest) continue
+    const closeAt = nearest?.closeAt ?? block.closeAt
     const weighed = weighUnits(vault.units, weightOf)
     out.push({
-      key: blockKey(currency, block.closeAt),
+      key: blockKey(currency, closeAt),
       currency,
       vault: vault.vault,
       openAt: block.openAt,
-      closeAt: block.closeAt,
+      closeAt,
       payout: Number(vault.payout),
       totalWeight: weighed.totalWeight,
       contributions: vault.contributions,
