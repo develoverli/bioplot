@@ -130,3 +130,50 @@ describe('a lamp that stands off its own coverage', () => {
     expect(drawn?.tiles[0]).toEqual({ x: 1, y: 1 })
   })
 })
+
+describe('a lamp that is already where it should be', () => {
+  /** A lamp three tiles wide over a single bed: three positions light it, all worth the same. */
+  function garden(): Garden {
+    return {
+      code: 'free_garden',
+      landId: 'sunny-field',
+      width: 8,
+      height: 4,
+      beds: [bed('a', 2, 1)],
+      devices: [
+        {
+          id: 'lamp',
+          code: 'rare_lamp_device',
+          rarity: 'rare',
+          tiles: [{ x: 2, y: 0 }],
+          covered: [
+            { x: 1, y: 1 },
+            { x: 2, y: 1 },
+            { x: 3, y: 1 },
+          ],
+        },
+      ],
+    }
+  }
+
+  it('stays put when moving it is worth nothing, and says nothing moved', () => {
+    const live = garden()
+    const plan = planLamps(live, 86_400, seeds)
+    expect(plan.movedLamps).toBe(0)
+    const ideal = applyLampPlan(live, plan)
+    expect(ideal.devices[0]?.covered).toEqual(live.devices[0]?.covered)
+    expect(ideal.devices[0]?.tiles[0]).toEqual({ x: 2, y: 0 })
+    // And the bed is still lit by it.
+    expect(plan.assignment.get('a')).toBe('rare')
+  })
+
+  it('does move it when another spot is worth more', () => {
+    const live = garden()
+    // A second, better bed out of reach of where the lamp stands now.
+    live.beds.push({ ...bed('b', 6, 1), rarity: 'legendary' })
+    live.beds[0] = { ...live.beds[0]!, rarity: 'common' }
+    const plan = planLamps(live, 86_400, seeds)
+    expect(plan.movedLamps).toBe(1)
+    expect(plan.assignment.get('b')).toBe('rare')
+  })
+})

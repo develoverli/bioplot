@@ -825,8 +825,8 @@ export function FarmWorkspace({
                 )
               ) : canImprove ? (
                 <>
-                  Your farm as it is. Moving {lampPlan?.placements.length} lamp
-                  {lampPlan?.placements.length === 1 ? '' : 's'} and feeding every pen its best is
+                  Your farm as it is. Moving {lampPlan?.movedLamps ?? 0} lamp
+                  {(lampPlan?.movedLamps ?? 0) === 1 ? '' : 's'} and feeding every pen its best is
                   worth{' '}
                   <span className="tabular font-semibold text-accent">
                     +{formatBiopoints(Math.max(0, idealPerDay - nowPerDay))}

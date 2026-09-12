@@ -49,6 +49,8 @@ export interface LampPlan {
   /** bed id -> the lamp that should cover it, or null. */
   assignment: Map<string, LampRarity | null>
   placements: LampPlacement[]
+  /** Lamps the plan actually picks up and puts somewhere else. */
+  movedLamps: number
   currentBiopoints: number
   bestBiopoints: number
   /** Beds whose lamp changes. */
@@ -96,15 +98,21 @@ interface Footprint {
   keys: Set<string>
   /** Where the lamp stands, relative to the same corner. */
   anchor: Tile
+  /** Where that corner is on the land today, so an unmoved lamp can be recognised. */
+  x: number
+  y: number
 }
 
 function footprintOf(device: GardenDevice): Footprint {
+  const stood = device.tiles[0]
   const single: Footprint = {
     w: 1,
     h: 1,
     offsets: [{ x: 0, y: 0 }],
     keys: new Set(['0,0']),
     anchor: { x: 0, y: 0 },
+    x: stood?.x ?? 0,
+    y: stood?.y ?? 0,
   }
   if (device.covered.length === 0) return single
 
@@ -127,6 +135,8 @@ function footprintOf(device: GardenDevice): Footprint {
     h: maxY - minY + 1,
     offsets,
     keys: new Set(offsets.map((tile) => `${tile.x},${tile.y}`)),
+    x: minX,
+    y: minY,
     // The real standing tile, even when it sits outside the coverage box: a lamp that lights
     // the beds around it is often not on a lit tile itself, and clamping it into the box made
     // the ideal view redraw an unmoved lamp one tile away. Drawing clamps to the land instead.
@@ -162,11 +172,20 @@ export function planLamps(
 
   const placements: LampPlacement[] = []
 
+  let movedLamps = 0
+
   for (const lamp of lamps) {
     const print = footprintOf(lamp)
     const { w, h } = print
-    let best: { x: number; y: number; gain: number } | null = null
+    let best: { x: number; y: number; gain: number; here: boolean } | null = null
 
+    /*
+      Several positions often light the very same beds: a lamp wider than the beds under it can
+      sit a tile either way for the same gain. Taking the first of them moved lamps that were
+      already right, which reads as the tool asking for work worth nothing. So a tie is settled
+      in favour of where the lamp stands today.
+    */
+    const TIE = 1e-6
     for (let y = 0; y + h <= garden.height; y++) {
       for (let x = 0; x + w <= garden.width; x++) {
         let gain = 0
@@ -179,11 +198,15 @@ export function planLamps(
           }
           gain += value(bed.rarity, lamp.rarity) - value(bed.rarity, already)
         }
-        if (best === null || gain > best.gain) best = { x, y, gain }
+        const here = x === print.x && y === print.y
+        if (best === null) best = { x, y, gain, here }
+        else if (gain > best.gain + TIE) best = { x, y, gain, here }
+        else if (here && gain >= best.gain - TIE) best = { x, y, gain, here }
       }
     }
 
     if (!best) continue
+    if (!best.here) movedLamps += 1
     placements.push({
       rarity: lamp.rarity,
       x: best.x,
@@ -213,7 +236,7 @@ export function planLamps(
     if (suggested !== bed.lamp) moved += 1
   }
 
-  return { assignment, placements, currentBiopoints, bestBiopoints, moved }
+  return { assignment, placements, currentBiopoints, bestBiopoints, moved, movedLamps }
 }
 
 /** The same garden with the lamps where they should be, for planning and drawing. */
