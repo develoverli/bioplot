@@ -37,7 +37,10 @@ jobs:
   append:
     runs-on: ubuntu-latest
     steps:
+      # Full history: the commit step rebases onto whatever landed while this job was reading.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -45,12 +48,14 @@ jobs:
 
       # Newest first, then backwards, so an hourly schedule reaches a full window in a day.
       - name: Read blocks from the explorer
-        timeout-minutes: 50
+        timeout-minutes: 120
         run: >
           node scripts/pools-history.mjs
           --target ${{ github.event.inputs.target || '50' }}
           --max ${{ github.event.inputs.max || '8' }}
 
+      # Reading a window takes tens of minutes, and someone may push to main meanwhile. The
+      # snapshot is one self-contained file, so rebasing onto their work always applies.
       - name: Commit when the snapshot changed
         run: |
           if git diff --quiet -- public/pools-history.json; then
@@ -58,8 +63,19 @@ jobs:
             exit 0
           fi
           NEWEST=$(node -e "console.log(JSON.parse(require('fs').readFileSync('public/pools-history.json','utf8')).blocks[0].closeAt)")
+          COUNT=$(node -e "console.log(JSON.parse(require('fs').readFileSync('public/pools-history.json','utf8')).blocks.length)")
           git config user.name "bioplot-bot"
           git config user.email "bioplot-bot@users.noreply.github.com"
           git add public/pools-history.json
-          git commit -m "🤖 data(pools): blocks up to ${NEWEST}"
-          git push
+          git commit -m "🤖 data(pools): ${COUNT} blocks, up to ${NEWEST}"
+          for attempt in 1 2 3 4 5; do
+            if git push; then
+              echo "pushed on attempt ${attempt}"
+              exit 0
+            fi
+            echo "push rejected; rebasing onto origin/${GITHUB_REF_NAME} and retrying"
+            git pull --rebase --autostash origin "${GITHUB_REF_NAME}" || exit 1
+            sleep 5
+          done
+          echo "::error::could not push the snapshot after five attempts"
+          exit 1
