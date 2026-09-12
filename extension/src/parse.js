@@ -407,6 +407,8 @@
       .filter((level) => typeof level?.code === 'string')
       .map((level) => ({
         code: level.code,
+        // The ladder carries display names ("Muddy Boots"); keep whichever field has one.
+        name: [level?.title, level?.name, level?.levelName].find((v) => typeof v === 'string') ?? null,
         level: Number(level?.level) || 0,
         pointsToClaim: Number(level?.pointsToClaim) || 0,
         icon:
@@ -425,6 +427,7 @@
 
     return {
       code: String(data?.code ?? ''),
+      name: [data?.title, data?.name, data?.levelName].find((v) => typeof v === 'string') ?? null,
       level: Number(data?.level) || 0,
       points: Number(data?.points) || 0,
       visualMaxPoints: Number(data?.visualMaxPoints) || 0,

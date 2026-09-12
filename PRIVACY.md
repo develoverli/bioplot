@@ -33,7 +33,7 @@ Uninstalling the extension removes its copy. Clearing site data for the app remo
 
 ## Third parties
 
-Two, both public and both read-only:
+Three, all public and all read-only:
 
 - Seed artwork is loaded directly from the game's own CDN (`static.chainers.io`) using the
   URLs the game publishes, so that CDN sees an ordinary image request from your browser.
@@ -41,6 +41,9 @@ Two, both public and both read-only:
   (`explorer.chainers.io`). Those requests name pool vault addresses and block numbers, which
   are public for everyone; they never include your wallet, your account, or anything from the
   capture. How this works is written up in `docs/market-rate.md`.
+- Coin prices (BNB and POL, in US dollars) are read from CoinGecko's public price endpoint
+  (`api.coingecko.com`) every few minutes while the pools tab is open. The request names the
+  two coins and nothing else. A reference price you type for CFB stays in your browser.
 
 No other external request is made.
 
@@ -55,8 +58,8 @@ You do not have to take this on trust. A browser extension is installed as ordin
 unminified JavaScript: open `chrome://extensions`, turn on Developer mode, and use **Inspect
 views** or **service worker** to read every line of it. The network tab of your own browser
 will show you the same thing from the outside: while Bioplot is open, it makes no request to
-any server we control, because there is none. The only hosts you will see are the game's CDN
-and the chain's public explorer.
+any server we control, because there is none. The only hosts you will see are the game's CDN,
+the chain's public explorer, and CoinGecko for coin prices.
 
 ## Contact
 

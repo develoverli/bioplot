@@ -118,8 +118,12 @@ async function vaultRows(
   return rows
 }
 
-/** Reads one settled block: its vault, then everything the vault saw. Null when the chain does not agree. */
-async function readSettledBlock(
+/**
+ * Reads one block by its close time: its vault, then everything the vault has seen so far.
+ * Works for a settled block and for the one open right now; for the latter the weight is a
+ * running total. Null when the chain does not agree with the schedule.
+ */
+async function readBlockAt(
   fetchJson: NonNullable<SyncOptions['fetchJson']>,
   currency: string,
   closeAt: string,
@@ -211,7 +215,7 @@ export async function syncCurrency(options: SyncOptions, currency: string): Prom
   for (const closeAt of missing) {
     if (signal?.aborted) break
     try {
-      const block = await readSettledBlock(
+      const block = await readBlockAt(
         fetchJson,
         currency,
         closeAt,
@@ -238,6 +242,40 @@ export async function syncCurrency(options: SyncOptions, currency: string): Prom
   }
 
   return [...have.values()]
+}
+
+/** A live reading of the block open right now, straight off its vault. */
+export interface OpenBlockReading {
+  block: MarketBlock
+  /** When the vault was read. */
+  at: number
+}
+
+/**
+ * What the open block holds right now, from the chain, so the page never has to ask the
+ * player to reload the game. The vault is found by the tier's payout at the block's open;
+ * its crop transfers so far are the weight.
+ */
+export async function readOpenBlock(
+  options: Pick<SyncOptions, 'pools' | 'weightOf' | 'signal' | 'fetchJson'>,
+  currency: string,
+  closesAt: string,
+): Promise<OpenBlockReading | null> {
+  const { pools, weightOf, signal } = options
+  const fetchJson = options.fetchJson ?? defaultFetchJson
+  const live = pools.blocks.find((block) => blockCurrency(pools, block) === currency)
+  const group = pools.groups.find((candidate) => candidate.groupCode === live?.groupCode)
+  if (!live || live.payout <= 0) return null
+  const block = await readBlockAt(
+    fetchJson,
+    currency,
+    closesAt,
+    group?.blockTimeSeconds ?? 14_400,
+    live.payout,
+    weightOf,
+    signal,
+  )
+  return block ? { block, at: Date.now() } : null
 }
 
 /** When the next settled block can be read: the live close plus the grace the payouts need. */

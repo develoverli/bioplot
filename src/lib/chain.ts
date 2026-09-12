@@ -32,6 +32,12 @@ export function currencyKey(currency: string): string | null {
   return key in CURRENCY_TOKENS ? key : null
 }
 
+/** The name players know the coin by. POL is still "MATIC" in the game and on the chain. */
+export function displayCurrency(currency: string): string {
+  const key = currencyKey(currency)
+  return key === 'POL' ? 'MATIC' : (key ?? currency)
+}
+
 export function tokenFor(currency: string): { address: string; decimals: number } | null {
   const key = currencyKey(currency)
   return key ? (CURRENCY_TOKENS[key] ?? null) : null
@@ -504,10 +510,40 @@ export const explorerApi = {
 /** Send in the last minutes: the block's weight is then known and nobody can pile in after you. */
 export const SEND_WINDOW_MS = 5 * 60_000
 
+/**
+ * The close of the block open right now, by the schedule.
+ *
+ * Blocks are back to back, so from any known close every later close is a whole number of
+ * block lengths away. A capture taken before the last close still tells the schedule; it only
+ * stops telling the weight.
+ */
+export function nextCloseAfter(endDate: string, blockTimeSeconds: number, now = Date.now()): string {
+  const end = Date.parse(endDate)
+  if (!Number.isFinite(end) || blockTimeSeconds <= 0) return endDate
+  const step = blockTimeSeconds * 1000
+  let at = end
+  while (at <= now) at += step
+  return new Date(at).toISOString()
+}
+
 export interface PoolAssessment {
   currency: string
   live: PoolBlock
   history: MarketHistory
+  /** The capture's block has already closed; `live` weights describe a finished block. */
+  stale: boolean
+  /** Where the block's current weight comes from. */
+  weightSource: 'chain' | 'capture' | 'none'
+  /** The block's weight right now, by that source. */
+  liveWeight: number
+  /** When the chain reading was taken, if that is the source. */
+  readAt: number | null
+  /** The open block's vault, when the chain reading found it. */
+  vault: string | null
+  /** When the block open right now closes, by the schedule: the live block's close, or a later one. */
+  closesAt: string
+  /** What the bag would earn if the block closed with exactly what it holds now. Meaningless when stale. */
+  earnNow: number
   /** The slot this block closes in, when the window has it. */
   slot: SlotStat | null
   /** What the block is expected to end at: the larger of what is in it and the slot's usual. */
@@ -521,6 +557,9 @@ export interface PoolAssessment {
   crowd: number
   /** Raw currency units the bag would earn here. */
   earn: number
+  /** The same in USD, when a price is known for the coin. */
+  earnUsd: number | null
+  earnNowUsd: number | null
   /** Enough settled blocks to say anything. */
   ready: boolean
 }
@@ -535,40 +574,83 @@ export interface PoolAssessment {
  * weight sits between the window's lightest and heaviest block, then by the closing hour's
  * index; the earnings are shown per currency and left for the player to weigh.
  */
+export interface LiveReadings {
+  [currency: string]: { block: MarketBlock; at: number } | undefined
+}
+
+/** USD per whole coin, or null when the coin has no known price. */
+export type PriceLookup = (currency: string) => number | null
+
+function toUsd(raw: number, currency: string, priceOf: PriceLookup): number | null {
+  const price = priceOf(currency)
+  if (price === null) return null
+  return (raw / 10 ** (tokenFor(currency)?.decimals ?? 9)) * price
+}
+
 export function assessPools(
   pools: Pools,
   histories: Record<string, MarketHistory>,
   bagWeight: number,
+  now = Date.now(),
+  readings: LiveReadings = {},
+  priceOf: PriceLookup = () => null,
 ): PoolAssessment[] {
   const out: PoolAssessment[] = []
   for (const live of pools.blocks) {
     const currency = blockCurrency(pools, live)
     const history = histories[currency]
     if (!history || !tokenFor(currency)) continue
-    const hour = new Date(live.endDate).getHours()
+    const group = pools.groups.find((candidate) => candidate.groupCode === live.groupCode)
+    const closesAt = nextCloseAfter(live.endDate, group?.blockTimeSeconds ?? 14_400, now)
+    const stale = closesAt !== live.endDate && Date.parse(live.endDate) <= now
+    const hour = new Date(closesAt).getHours()
     const slot = history.slots.find((candidate) => candidate.hour === hour) ?? null
     const rated = history.blocks.filter((block) => rateOfBlock(block) > 0)
     const weights = rated.map((block) => block.totalWeight)
     const low = weights.length > 0 ? Math.min(...weights) : 0
     const high = weights.length > 0 ? Math.max(...weights) : 0
     const usual = slot?.weight ?? (weights.length > 0 ? weights.reduce((a, b) => a + b, 0) / weights.length : 0)
-    const projected = Math.max(live.totalWeight, usual)
+    // The chain reading of the open block beats the capture; a finished block says nothing
+    // about the one open now, so a stale capture without a reading has no weight at all.
+    const reading = readings[currency]
+    const fromChain = reading && reading.block.closeAt === closesAt ? reading : null
+    const weightSource: PoolAssessment['weightSource'] = fromChain ? 'chain' : stale ? 'none' : 'capture'
+    const liveWeight = fromChain ? fromChain.block.totalWeight : stale ? 0 : live.totalWeight
+    const projected = Math.max(liveWeight, usual)
     out.push({
       currency,
       live,
       history,
+      stale,
+      weightSource,
+      liveWeight,
+      readAt: fromChain?.at ?? null,
+      vault: fromChain?.block.vault ?? null,
+      closesAt,
       slot,
       projected,
       low,
       high,
       position: high > low ? Math.min(1, Math.max(0, (projected - low) / (high - low))) : 0,
       crowd: usual > 0 ? projected / usual : 0,
-      earn: estimateEarnings(live.payout, bagWeight, usual, live.totalWeight),
+      earn: estimateEarnings(live.payout, bagWeight, usual, liveWeight),
+      earnNow: weightSource === 'none' ? 0 : estimateEarnings(live.payout, bagWeight, 0, liveWeight),
+      earnUsd: null,
+      earnNowUsd: null,
       ready: history.complete >= 6,
     })
   }
+  for (const entry of out) {
+    entry.earnUsd = toUsd(entry.earn, entry.currency, priceOf)
+    entry.earnNowUsd = entry.weightSource === 'none' ? null : toUsd(entry.earnNow, entry.currency, priceOf)
+  }
+  // Money first where money is known; a pool nobody can price is ranked by its own history,
+  // after the priced ones, and the page says so.
   return out.sort((a, b) => {
     if (a.ready !== b.ready) return a.ready ? -1 : 1
+    const priced = (entry: PoolAssessment) => entry.earnUsd !== null && bagWeight > 0
+    if (priced(a) !== priced(b)) return priced(a) ? -1 : 1
+    if (priced(a) && priced(b)) return (b.earnUsd ?? 0) - (a.earnUsd ?? 0) || a.position - b.position
     return a.position - b.position || b.earn - a.earn
   })
 }

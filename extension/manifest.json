@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Bioplot Farm Reader",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Reads your Chainers Farm inventory inside your own browser and hands it to Bioplot. Read-only: it never plants, never writes, and nothing leaves your machine.",
   "icons": {
     "16": "icons/icon-16.png",

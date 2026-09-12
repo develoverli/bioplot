@@ -55,9 +55,9 @@ chainers.io tab ──▶ Bioplot Farm Reader (extension) ──▶ Bioplot tab
 ```
 
 There is no server. No account, no backend, no analytics, no telemetry. The app is a static
-page; the extension talks only to a Bioplot page open in the same browser. The one outside
-request the app makes is to the chain's public explorer, for pool history that is public
-anyway; it carries no account data.
+page; the extension talks only to a Bioplot page open in the same browser. The outside
+requests the app makes are to the chain's public explorer, for pool history that is public
+anyway, and to CoinGecko for BNB and POL prices; neither carries any account data.
 
 ### The extension
 

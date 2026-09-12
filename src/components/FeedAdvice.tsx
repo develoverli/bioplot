@@ -35,8 +35,8 @@ export function FeedAdvice({ animal }: { animal: FarmAnimal }) {
   if (feeds.length === 0) {
     return (
       <p className="mt-2 text-xs text-muted">
-        No feed for this pen appears in the capture. Open the Workshop and the animals screen in
-        chainers.io, then sync again.
+        No feed for this pen appears in the capture. Reload the farm page in chainers.io, then sync
+        again.
       </p>
     )
   }
@@ -103,7 +103,7 @@ export function FeedAdvice({ animal }: { animal: FarmAnimal }) {
               </>
             ) : (
               <p className="mt-0.5 text-xs text-muted">
-                The recipes are not in the capture. Open the Workshop in chainers.io, then sync.
+                The recipes are not in the capture. Reload the farm page in chainers.io, then sync.
               </p>
             )}
           </div>

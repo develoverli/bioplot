@@ -23,8 +23,7 @@ export function FeedPanel({ bare = false }: { bare?: boolean }) {
     return (
       <Frame title="Animals and feed">
         <p className="text-sm text-muted">
-          Nothing captured yet. Open the Workshop and the animals screen in chainers.io, then sync
-          again: the recipes and your animals come from there.
+          Nothing captured yet. Go to chainers.io with the extension installed and reload the farm page; loading the farm is all the capture needs. Then press Sync now here.
         </p>
       </Frame>
     )
@@ -85,7 +84,7 @@ export function FeedPanel({ bare = false }: { bare?: boolean }) {
       {craftable.length === 0 ? (
         <p className="text-sm text-muted">
           {report.options.length === 0
-            ? 'No feed recipes in the capture. Open the Workshop in chainers.io once, then sync again.'
+            ? 'No feed recipes in the capture. Reload the farm page in chainers.io, then sync again.'
             : `None of the ${report.options.length} feed recipes can be made from the harvest you hold right now. Grow more crops of the matching rarity: a recipe takes ingredients of its own rarity.`}
         </p>
       ) : (

@@ -207,7 +207,9 @@ export default function App() {
                   horizonHours={horizonHours}
                   onOpenSetup={() => setSetupOpen(true)}
                 />
-                <PickPlotPlaceholder hint="Load a farm to see each bed's planting order." />
+                {tab === 'farm' ? (
+                  <PickPlotPlaceholder hint="Load a farm to see each bed's planting order." />
+                ) : null}
               </>
             }
           >

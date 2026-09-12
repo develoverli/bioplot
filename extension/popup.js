@@ -37,7 +37,7 @@ function describe() {
     return {
       tone: 'bad',
       text: 'Nothing captured',
-      hint: 'Open chainers.io and reload the page. If this stays empty, reload the extension in chrome://extensions and reload the tab.',
+      hint: 'Go to chainers.io and reload the farm page. If this stays empty, reload the extension in chrome://extensions and reload the tab.',
     }
   }
 
@@ -47,7 +47,7 @@ function describe() {
       text: sawFarm ? 'Farm seen, nothing recognised' : 'Waiting for your farm',
       hint: sawFarm
         ? 'The farm endpoints were captured but no rows were understood. Copy diagnostics and open an issue.'
-        : 'Enter your farm inside chainers.io once, then reopen this popup.',
+        : 'Reload the farm page in chainers.io, then reopen this popup.',
     }
   }
 
@@ -128,7 +128,7 @@ el('clear').addEventListener('click', () => {
     seen = {}
     payload = null
     render()
-    status('Cleared. Reload chainers.io to capture again.')
+    status('Cleared. Reload the farm page in chainers.io to capture again.')
   })
 })
 

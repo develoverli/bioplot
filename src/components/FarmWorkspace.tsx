@@ -252,7 +252,7 @@ function FeedRecipe({ choice, best }: { choice: FeedChoice; best: boolean }) {
         </ul>
       ) : (
         <p className="mt-1 text-xs text-faint">
-          No recipe for this feed in the capture. Open the Workshop in chainers.io, then sync.
+          No recipe for this feed in the capture. Reload the farm page in chainers.io, then sync.
         </p>
       )}
 
@@ -301,7 +301,7 @@ function FeedLadder({ animal }: { animal: FarmAnimal }) {
           )}
         </p>
         <p className="mt-1 text-xs text-faint">
-          Open the Workshop and the animals screen in chainers.io, then sync again. Naming its
+          Reload the farm page in chainers.io, then sync again. Naming its
           ingredients without the game's recipe would be a guess, and a wrong shopping list is
           worse than none.
         </p>
@@ -713,12 +713,14 @@ export function FarmWorkspace({
             horizonHours={horizonHours}
             onOpenSetup={onOpenSetup}
           />
-          <SelectedBed
-            garden={garden}
-            planByBed={planByBed}
-            selected={selected}
-            horizonSec={horizonSec}
-          />
+          {center ? null : (
+            <SelectedBed
+              garden={garden}
+              planByBed={planByBed}
+              selected={selected}
+              horizonSec={horizonSec}
+            />
+          )}
         </>
       }
     >

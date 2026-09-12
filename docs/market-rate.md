@@ -88,6 +88,12 @@ A player can send their harvest to any of their tier's three pools, so the quest
 
 A pool with fewer than six settled blocks (a day) is listed but never recommended.
 
+Prices: BNB and POL come from CoinGecko's public endpoint (no key, browser requests allowed),
+refreshed every five minutes and cached in the browser. When every pool the bag could go to
+has a price, the ranking is by dollars earned; pools without a price (CFB has no public
+market) come after, ranked against their own history, and the page says so. A player may type
+a reference price for CFB; it is stored on their device and used only there.
+
 ## The shared history
 
 Reading a block from the chain costs about twenty seconds, and every visitor would repeat it.

@@ -142,6 +142,7 @@ const poolsSchema = z.object({
   level: z
     .object({
       code: z.string(),
+      name: z.string().nullable().default(null),
       level: z.number(),
       points: z.number(),
       visualMaxPoints: z.number(),
@@ -153,6 +154,7 @@ const poolsSchema = z.object({
     .array(
       z.object({
         code: z.string(),
+        name: z.string().nullable().default(null),
         level: z.number(),
         pointsToClaim: z.number(),
         icon: z.string().nullable(),

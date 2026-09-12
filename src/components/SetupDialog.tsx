@@ -148,7 +148,8 @@ export function SetupDialog({ open, onClose }: { open: boolean; onClose: () => v
           )}
         </Step>
         <Step done={loaded} n={2}>
-          Open <strong>chainers.io</strong> and enter your farm once, so the extension sees it.
+          Go to <strong>chainers.io</strong> and reload the farm page. Loading the farm is all the
+          capture needs: plots, seeds, animals, recipes and the pools come with it.
         </Step>
         <Step done={loaded} n={3}>
           Come back here and hit <strong>Sync now</strong>.
@@ -183,8 +184,8 @@ export function SetupDialog({ open, onClose }: { open: boolean; onClose: () => v
           ) : null}
           {status.result.inventory.gardens.length === 0 ? (
             <p className="mt-1 text-xs text-[color:var(--warning)]">
-              No farm layout in this capture. Reload the extension, reload chainers.io, enter the
-              farm, then sync again.
+              No farm layout in this capture. Reload the extension, then reload the farm page in
+              chainers.io and sync again.
             </p>
           ) : null}
         </div>

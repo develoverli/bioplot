@@ -215,6 +215,8 @@ export interface PoolGroup {
 
 export interface PoolLevel {
   code: string
+  /** The tier's display name when the game sent one ("Muddy Boots"). */
+  name: string | null
   level: number
   points: number
   visualMaxPoints: number
@@ -235,6 +237,7 @@ export interface PoolPayout {
 /** One rung of the tier ladder. */
 export interface PoolTier {
   code: string
+  name: string | null
   level: number
   pointsToClaim: number
   icon: string | null

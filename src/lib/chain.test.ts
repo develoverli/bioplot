@@ -336,8 +336,13 @@ describe('assessPools', () => {
       CFB: windowOf('CFB', [100, 200, 300, 400, 500, 600]),
       BNB: windowOf('BNB', [100, 200, 300, 400, 500, 600]),
     }
-    const ranked = assessPools(pools, histories, 50)
+    const before = Date.parse(localClose(8)) - 3_600_000
+    const ranked = assessPools(pools, histories, 50, before)
     expect(ranked.map((entry) => entry.currency)).toEqual(['CFB', 'BNB'])
+    expect(ranked[0]?.stale).toBe(false)
+    expect(ranked[0]?.closesAt).toBe(localClose(8))
+    // If it closed with what it holds now: 850 × 50 / (100 + 50).
+    expect(ranked[0]?.earnNow).toBeCloseTo((850 * 50) / 150)
     // Both blocks project to the slot's usual final weight (350) since neither is fuller yet.
     expect(ranked[0]?.projected).toBe(350)
     expect(ranked[0]?.position).toBeCloseTo(0.5)
@@ -350,6 +355,62 @@ describe('assessPools', () => {
     const pools = { ...emptyPools, blocks: [liveBlock('CFB', 10, 850), liveBlock('BNB', 10, 32)] }
     const histories = { CFB: windowOf('CFB', [100]), BNB: windowOf('BNB', [100, 100, 100, 100, 100, 100]) }
     expect(assessPools(pools, histories, 1).map((entry) => entry.currency)).toEqual(['BNB', 'CFB'])
+  })
+
+  it('treats a capture from a closed block as stale and looks at the block open now', () => {
+    const pools = {
+      ...emptyPools,
+      blocks: [liveBlock('CFB', 500, 850)],
+      groups: [{ groupCode: 'farmCFB', title: 'CFB', currency: 'CFB', icon: null, blockTimeSeconds: 14_400 }],
+    }
+    const histories = { CFB: windowOf('CFB', [100, 200, 300, 400, 500, 600]) }
+    const later = Date.parse(localClose(8)) + 3_600_000
+    const [entry] = assessPools(pools, histories, 50, later)
+    expect(entry?.stale).toBe(true)
+    expect(entry?.closesAt).toBe(new Date(Date.parse(localClose(8)) + 14_400_000).toISOString())
+    // The old block's 500 must not be taken as the new block's floor.
+    expect(entry?.projected).toBe(350)
+    expect(entry?.earnNow).toBe(0)
+    expect(entry?.weightSource).toBe('none')
+  })
+
+  it('ranks by dollars when prices are known, and by history for the rest', () => {
+    const pools = {
+      ...emptyPools,
+      blocks: [liveBlock('CFB', 100, 850_000_000_000), liveBlock('BNB', 100, 2_805_000)],
+    }
+    const histories = {
+      CFB: windowOf('CFB', [100, 200, 300, 400, 500, 600]),
+      BNB: windowOf('BNB', [100, 200, 300, 400, 500, 600]),
+    }
+    const before = Date.parse(localClose(8)) - 3_600_000
+    // Only BNB has a price: it goes first, whatever its position; CFB follows, unpriced.
+    const ranked = assessPools(pools, histories, 50, before, {}, (c) => (c === 'BNB' ? 700 : null))
+    expect(ranked.map((entry) => entry.currency)).toEqual(['BNB', 'CFB'])
+    expect(ranked[0]?.earnUsd).toBeCloseTo((2_805_000 * 50) / 400 / 1e9 * 700)
+    expect(ranked[1]?.earnUsd).toBeNull()
+    // With both priced, the bigger payout in dollars wins.
+    const both = assessPools(pools, histories, 50, before, {}, (c) => (c === 'BNB' ? 700 : 0.02))
+    expect(both[0]?.currency).toBe('CFB')
+  })
+
+  it('takes the chain reading of the open block over the capture', () => {
+    const pools = {
+      ...emptyPools,
+      blocks: [liveBlock('CFB', 500, 850)],
+      groups: [{ groupCode: 'farmCFB', title: 'CFB', currency: 'CFB', icon: null, blockTimeSeconds: 14_400 }],
+    }
+    const histories = { CFB: windowOf('CFB', [100, 200, 300, 400, 500, 600]) }
+    const later = Date.parse(localClose(8)) + 3_600_000
+    const closesAt = new Date(Date.parse(localClose(8)) + 14_400_000).toISOString()
+    const reading = { block: { ...block(closesAt, 850, 40), currency: 'CFB' }, at: later }
+    const [entry] = assessPools(pools, histories, 10, later, { CFB: reading })
+    expect(entry?.weightSource).toBe('chain')
+    expect(entry?.liveWeight).toBe(40)
+    expect(entry?.earnNow).toBeCloseTo((850 * 10) / 50)
+    // A reading of some other block is ignored.
+    const other = { block: { ...block(localClose(8), 850, 40), currency: 'CFB' }, at: later }
+    expect(assessPools(pools, histories, 10, later, { CFB: other })[0]?.weightSource).toBe('none')
   })
 })
 

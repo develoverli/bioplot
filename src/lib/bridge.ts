@@ -87,7 +87,7 @@ export function requestInventory(timeoutMs = 5000): Promise<ImportPayload> {
       cleanup()
       reject(
         new BridgeError(
-          'No answer from the extension. Open chainers.io, load your farm once, then try again.',
+          'No answer from the extension. Reload the farm page in chainers.io with the extension installed, then try again.',
         ),
       )
     }, timeoutMs)
