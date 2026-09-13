@@ -70,6 +70,8 @@ jobs:
           body: |
             **Bioplot Farm Reader v${{ steps.version.outputs.version }}** — Chrome extension (Manifest V3, read-only).
 
-            Install from the zip: download it, unzip, then `chrome://extensions` → Developer mode → **Load unpacked** → pick the unzipped folder. Verify the download against `SHA256SUMS.txt`.
+            **Install from the [Chrome Web Store](https://chromewebstore.google.com/detail/bioplot-farm-reader/acjgafpghcopmjnplglomadieaodjcha).** Store updates reach installed copies automatically; Google reviews each version, so the store can trail this release by a few days.
+
+            The zip below is the exact file uploaded to the store. Use it to check the code or to install on a Chromium browser without the store: unzip it, then `chrome://extensions` → Developer mode → **Load unpacked** → pick the unzipped folder. Verify the download against `SHA256SUMS.txt`.
 
             The extension only talks to a Bioplot page open in the same browser. See [PRIVACY.md](https://github.com/${{ github.repository }}/blob/main/PRIVACY.md).

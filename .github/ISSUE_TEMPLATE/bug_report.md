@@ -21,7 +21,8 @@ assignees: ''
 ## Environment
 
 - Browser and version:
-- Extension version (`extension/manifest.json` → `version`):
+- Extension installed from: Chrome Web Store / release zip / unpacked source checkout
+- Extension version (shown at `chrome://extensions` under Bioplot Farm Reader):
 - App: local `pnpm dev` / deployed at:
 - Land, number of plots and lamps involved:
 

@@ -63,6 +63,30 @@ export function Button({
   )
 }
 
+/** Button's twin for a link that opens somewhere else, styled the same. */
+export function ButtonLink({
+  variant = 'secondary',
+  className = '',
+  href,
+  children,
+}: {
+  variant?: ButtonVariant
+  className?: string
+  href: string
+  children: ReactNode
+}) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer noopener"
+      className={`inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border px-3 text-sm font-medium no-underline transition-colors duration-150 ${BUTTON_STYLES.get(variant)} ${className}`}
+    >
+      {children}
+    </a>
+  )
+}
+
 export function IconButton({
   label,
   className = '',

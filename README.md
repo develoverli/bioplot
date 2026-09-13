@@ -4,7 +4,8 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-2ea043.svg)](LICENSE)
 [![Read-only extension](https://img.shields.io/badge/extension-read--only-86efac.svg)](PRIVACY.md)
 [![No backend](https://img.shields.io/badge/backend-none-6b7280.svg)](PRIVACY.md)
-[![Chrome Web Store](https://img.shields.io/badge/chrome%20web%20store-awaiting%20review-f59e0b.svg)](#the-extension)
+[![Chrome Web Store version](https://img.shields.io/chrome-web-store/v/acjgafpghcopmjnplglomadieaodjcha?label=chrome%20web%20store)](https://chromewebstore.google.com/detail/bioplot-farm-reader/acjgafpghcopmjnplglomadieaodjcha)
+[![Chrome Web Store users](https://img.shields.io/chrome-web-store/users/acjgafpghcopmjnplglomadieaodjcha?label=users)](https://chromewebstore.google.com/detail/bioplot-farm-reader/acjgafpghcopmjnplglomadieaodjcha)
 
 Biopoint planner for [Chainers Farm](https://chainers.io/). It reads your plots, seeds and
 animals out of your own browser, and tells you exactly what to plant to bank the most
@@ -74,9 +75,10 @@ anyway, and to CoinGecko for BNB and POL prices; neither carries any account dat
 the responses the game already made, and never issues a game request, never writes, never
 signs. It never reads a token, a cookie or a password. See [PRIVACY.md](PRIVACY.md).
 
-It is in review for the Chrome Web Store. Until Google approves it, the way in is the release
-zip or the unpacked folder, which is the same code either way: the store listing will serve
-exactly what a tag built.
+**[Install it from the Chrome Web Store.](https://chromewebstore.google.com/detail/bioplot-farm-reader/acjgafpghcopmjnplglomadieaodjcha)**
+The listing serves exactly what a release tag built: the zip on the
+[Releases](https://github.com/develoverli/bioplot/releases) page is the same file uploaded to
+the store.
 
 Loading the farm page is the whole capture: plots, seeds, animals, crafting recipes and the
 reward pools arrive together. The popup says what it holds and what to do next, in one line.
@@ -88,6 +90,24 @@ ordinary unminified JavaScript: `chrome://extensions` → Developer mode → **I
 
 ## Getting started
 
+### Using it
+
+1. Install **Bioplot Farm Reader** from the
+   [Chrome Web Store](https://chromewebstore.google.com/detail/bioplot-farm-reader/acjgafpghcopmjnplglomadieaodjcha).
+2. Open [Bioplot](https://develoverli.github.io/bioplot/).
+3. Open [chainers.io](https://chainers.io/) and reload the farm page. Loading the farm is the
+   whole capture.
+4. Back in Bioplot, press **Load farm**, then **Sync now**.
+
+Nothing to install at all? **Plan by hand** in the app works without the extension.
+
+On a Chromium browser without the store (or to run a specific version), every tagged release
+ships a ready-to-load zip on the [Releases](https://github.com/develoverli/bioplot/releases)
+page, with a `SHA256SUMS.txt` next to it: unzip it, then `chrome://extensions` → Developer mode
+→ **Load unpacked** → pick the folder.
+
+### Developing
+
 Requirements: Node 20+, [pnpm](https://pnpm.io/) 11 (`corepack enable` is enough), and
 Python 3.10+ (the build renders the policy pages with a stdlib-only script).
 
@@ -98,18 +118,10 @@ pnpm install
 pnpm dev          # the app on http://localhost:5173
 ```
 
-Load the extension: `chrome://extensions` → Developer mode → **Load unpacked** → pick the
-`extension/` folder. Then open chainers.io, reload the farm page, and press **Sync now** in the
-app. Loading the farm is the whole capture.
-
-Not building it yourself? Every tagged version ships a ready-to-load zip on the
-[Releases](https://github.com/develoverli/bioplot/releases) page, with a `SHA256SUMS.txt`
-next to it. Unzip it and **Load unpacked** the folder the same way.
-
-**Installing by hand is temporary.** The extension has been submitted to the Chrome Web Store
-and is waiting on Google's review, which takes days rather than minutes. Once it is approved,
-installing it is one click from the store and this section becomes a footnote: the app itself
-links to the listing as soon as it exists, and shows these steps only while it does not.
+To work on the extension, load your checkout instead of the store build:
+`chrome://extensions` → Developer mode → **Load unpacked** → pick the `extension/` folder.
+Disable the store copy while you do, so only one reader captures the farm. Then open
+chainers.io, reload the farm page, and press **Sync now** in the app.
 
 Other scripts:
 
@@ -166,16 +178,12 @@ rules above are the review checklist. Security concerns go through [SECURITY.md]
 
 Everyone taking part is expected to follow the [code of conduct](CODE_OF_CONDUCT.md).
 
-Once the Chrome Web Store listing is live, two things change and nothing else: the
-`VITE_EXTENSION_URL` repository variable gets the listing URL, so the app links to it instead
-of explaining how to load an unpacked folder, and the badge above stops saying "awaiting
-review". The steps are in [docs/releasing.md](docs/releasing.md).
-
 ## Releases and deployment
 
 Pushes to `main` run CI and deploy the app to GitHub Pages. A tag `vX.Y.Z` packages the
-extension and publishes a GitHub Release with the zip attached. The whole procedure, including
-the one-time repository setup and the Chrome Web Store submission, is in
+extension and publishes a GitHub Release with the zip attached; that zip is then uploaded as the
+new version of the Chrome Web Store listing. The whole procedure, including the one-time
+repository setup and the store update, is in
 [docs/releasing.md](docs/releasing.md); the store-listing answers are in
 [docs/publishing.md](docs/publishing.md).
 

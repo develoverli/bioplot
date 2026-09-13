@@ -1,16 +1,17 @@
 /**
  * Outward links, in one place.
  *
- * Two of these do not exist until the thing they point at is published, and a guessed URL is a
- * 404 with a promise attached. So both are build-time settings that default to empty, and the
- * UI falls back to something true when they are unset rather than pretending.
- *
- * Set them in `.env.local`:
+ * The extension is published, so its store listing is the default and every build links to it
+ * with nothing to configure. A fork that publishes its own copy overrides it at build time, and
+ * sets its own public origin the same way:
  *
  *     VITE_EXTENSION_URL=https://chromewebstore.google.com/detail/<your-id>
  *     VITE_SITE_URL=https://bioplot.example
  */
-export const EXTENSION_URL: string = import.meta.env.VITE_EXTENSION_URL?.trim() ?? ''
+const STORE_LISTING_URL =
+  'https://chromewebstore.google.com/detail/bioplot-farm-reader/acjgafpghcopmjnplglomadieaodjcha'
+
+export const EXTENSION_URL: string = import.meta.env.VITE_EXTENSION_URL?.trim() || STORE_LISTING_URL
 
 /** The app's own public origin. Only needed where a link must be absolute. */
 export const SITE_URL: string = import.meta.env.VITE_SITE_URL?.trim().replace(/\/$/, '') ?? ''

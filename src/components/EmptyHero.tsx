@@ -1,4 +1,5 @@
 import { Coins, Lightbulb, PawPrint, PlugZap, Sprout } from 'lucide-react'
+import { EXTENSION_URL } from '../lib/links'
 import { Button } from './ui'
 
 const FEATURES = [
@@ -67,6 +68,19 @@ export function EmptyHero({
           {planningByHand ? 'Hide the manual editor' : 'or plan by hand, without the extension'}
         </button>
       </div>
+
+      <p className="mt-5 text-xs text-muted">
+        No extension yet?{' '}
+        <a
+          href={EXTENSION_URL}
+          target="_blank"
+          rel="noreferrer noopener"
+          className="underline-offset-4 hover:underline"
+        >
+          Get Bioplot Farm Reader from the Chrome Web Store
+          <span className="sr-only"> (opens in a new tab)</span>
+        </a>
+      </p>
     </div>
   )
 }

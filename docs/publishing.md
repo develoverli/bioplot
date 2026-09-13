@@ -12,15 +12,20 @@ this page is the list of things that have to be true.
    - `extension/popup.js` → `const SITE_URL = 'https://<domain>'`
 2. **Add the app's origin** to `extension/manifest.json` → the third `content_scripts` entry's
    `matches`, or the extension cannot talk to the deployed page.
-3. **Submit the extension**, then set the `VITE_EXTENSION_URL` repository variable (or
-   `.env.local`) to the store URL and redeploy, so the app stops showing the "load unpacked"
-   instructions.
+3. **Point the app at the right listing.** Upstream needs nothing: the app links to the
+   official [Bioplot Farm Reader](https://chromewebstore.google.com/detail/bioplot-farm-reader/acjgafpghcopmjnplglomadieaodjcha)
+   listing by default. A fork that publishes its own extension sets the `VITE_EXTENSION_URL`
+   repository variable (or `.env.local`) to its own store URL once approved, and redeploys.
 4. Check the copyright year and the "last updated" dates in `PRIVACY.md` and `TERMS.md`, then
    run `pnpm legal` so `public/privacy.html` and `public/terms.html` match.
 5. If you fork and publish under your own name, point the contact links in `src/lib/links.ts`,
    `PRIVACY.md` and `TERMS.md` at your own issue tracker.
 
 ## The store listing
+
+These are the answers the live listing was submitted with. Keep them current: when a release
+changes a permission, a host or what happens to the data, update this page and the listing's
+**Privacy practices** tab together.
 
 Chrome Web Store asks for a justification for every permission. The honest answers:
 

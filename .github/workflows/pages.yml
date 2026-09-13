@@ -7,8 +7,9 @@ name: Deploy to GitHub Pages
 #
 # Optional repository variables (Settings → Secrets and variables → Actions → Variables):
 #   VITE_SITE_URL        the app's public origin, once you have one
-#   VITE_EXTENSION_URL   the Chrome Web Store listing, once it is approved
-# Both default to empty, and the app falls back to something true when they are unset.
+#   VITE_EXTENSION_URL   a fork's own Chrome Web Store listing
+# Both are optional. Unset, the site URL stays empty and the extension link points at the
+# official Bioplot Farm Reader listing.
 # See docs/releasing.md.
 
 on:

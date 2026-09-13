@@ -1,7 +1,7 @@
 # Releasing
 
 How a change goes from `main` to players: continuous integration, the deployed app, the
-extension zip on GitHub Releases, and the Chrome Web Store. Everything here runs from the
+extension zip on GitHub Releases, and the Chrome Web Store listing. Everything here runs from the
 workflows in `.github/workflows/`; the only manual steps are the ones GitHub and Google insist
 on.
 
@@ -29,12 +29,12 @@ Do these once, in the repository **Settings**:
    | Variable | When to set it | Value |
    | --- | --- | --- |
    | `VITE_SITE_URL` | once the app has a public address you intend to keep | e.g. `https://<owner>.github.io/bioplot` or your own domain, no trailing slash |
-   | `VITE_EXTENSION_URL` | once the extension is approved on the Chrome Web Store | `https://chromewebstore.google.com/detail/<extension-id>` |
+   | `VITE_EXTENSION_URL` | only in a fork that publishes its own copy of the extension | `https://chromewebstore.google.com/detail/<extension-id>` |
 
-   Both default to empty. While `VITE_EXTENSION_URL` is empty the app shows the "load
-   unpacked" instructions instead of a store link; while `VITE_SITE_URL` is empty nothing
-   depends on it. After changing a variable, re-run **Deploy to GitHub Pages** from the
-   Actions tab (`workflow_dispatch`) so the deployed app picks it up.
+   Both are optional. Unset, `VITE_EXTENSION_URL` falls back to the official listing (the
+   default lives in `src/lib/links.ts`), and nothing depends on `VITE_SITE_URL`. After
+   changing a variable, re-run **Deploy to GitHub Pages** from the Actions tab
+   (`workflow_dispatch`) so the deployed app picks it up.
 
 ## Cutting a release
 
@@ -93,33 +93,44 @@ Also set `SITE_URL` at the top of `extension/popup.js` so the popup can link to 
 and terms pages. Both edits change what the extension ships, so they go out with a version
 bump and a new release, and if the extension is on the store, a new store submission.
 
-## Publishing to the Chrome Web Store
+## The Chrome Web Store
 
-Google reviews every version by hand, so expect days, not minutes, the first time.
+The extension is live as
+[Bioplot Farm Reader](https://chromewebstore.google.com/detail/bioplot-farm-reader/acjgafpghcopmjnplglomadieaodjcha)
+(item ID `acjgafpghcopmjnplglomadieaodjcha`), published by `develoverli`, first listed at
+v0.2.3. The app links to it by default; the README badges read its version and user count.
 
-1. Register a developer account at <https://chrome.google.com/webstore/devconsole> (one-time
-   fee), and complete the account's contact email and the two-factor requirement.
-2. **New item** → upload the `bioplot-farm-reader-v<version>.zip` from the GitHub Release.
-   Upload the release asset rather than a local zip, so what is on the store is byte-for-byte
-   what the tag built.
-3. Fill in the listing. The store asks for a justification for every permission and a
-   declaration about data use; the honest answers are in [`publishing.md`](publishing.md).
-   The description in `extension/manifest.json` is a good first paragraph.
-4. **Privacy policy URL**: `https://<your app origin>/privacy.html`. The page is part of the
-   deployed app, so the app has to be deployed first.
-5. Submit for review. When it is approved, copy the listing URL
-   (`https://chromewebstore.google.com/detail/<id>`), set it as the `VITE_EXTENSION_URL`
-   repository variable, and re-run the Pages deploy. The app now links to the store instead
-   of explaining "load unpacked".
+### Shipping a new version to the store
 
-For every later release: bump, tag, wait for the GitHub Release, then upload the new zip as a
-new version of the same store item. The store rejects a zip whose `manifest.json` version is
-not higher than the current one, which is another reason the tag and the manifest have to
-agree.
+Only changes under `extension/` need this. App-only changes ship with the Pages deploy and
+never touch the store.
+
+1. Cut a release as above and wait for the GitHub Release.
+2. Download `bioplot-farm-reader-v<version>.zip` from the release. Upload the release asset
+   rather than a local zip, so what is on the store is byte-for-byte what the tag built.
+3. <https://chrome.google.com/webstore/devconsole> → Bioplot Farm Reader → **Package** →
+   **Upload new package** → that zip. The store rejects a zip whose `manifest.json` version is
+   not higher than the live one, which is another reason the tag and the manifest have to
+   agree.
+4. If the change adds a permission, a host, or a new kind of data handling, update the
+   **Privacy practices** tab with the answers in [`publishing.md`](publishing.md) before
+   submitting. A new permission also disables the extension for existing users until they
+   accept it, so say why in the release notes.
+5. **Submit for review.** Google reviews every version by hand, usually within a few days.
+   Installed copies update themselves once it is approved.
+
+### Publishing a fork's own copy
+
+A fork that wants its own listing registers a developer account at the console (one-time fee,
+contact email and two-factor required), creates a **New item** from its release zip, fills in
+the listing from [`publishing.md`](publishing.md), points the privacy policy at
+`https://<its app origin>/privacy.html` (deploy the app first), and once approved sets
+`VITE_EXTENSION_URL` to its own listing.
 
 ## Checklist before you announce
 
 - [ ] `CI` is green on `main`.
 - [ ] The GitHub Release has the zip and the checksum file attached.
 - [ ] Loaded the released zip unpacked and synced a real farm against the deployed app.
+- [ ] If `extension/` changed: the zip is uploaded to the store and submitted for review.
 - [ ] `PRIVACY.md` and the deployed `privacy.html` say the same thing.

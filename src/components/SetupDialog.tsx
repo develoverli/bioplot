@@ -1,19 +1,17 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Check, Download, PlugZap, RotateCcw, ShieldCheck, X } from 'lucide-react'
+import { Check, Download, ExternalLink, PlugZap, RotateCcw, ShieldCheck, X } from 'lucide-react'
 import { countArtwork } from '../lib/artwork'
 import { BridgeError, detectExtension, fingerprint, requestInventory } from '../lib/bridge'
 import { fromImportPayload, importPayloadSchema, type ImportResult } from '../lib/inventory'
 import { EXTENSION_URL, PRIVACY_URL, TERMS_URL } from '../lib/links'
 import { useStore } from '../store'
-import { Button, Disclosure, Modal } from './ui'
+import { Button, ButtonLink, Disclosure, Modal } from './ui'
 
 type Status =
   | { kind: 'idle' }
   | { kind: 'working' }
   | { kind: 'ok'; result: ImportResult }
   | { kind: 'error'; message: string }
-
-const REPO_EXTENSION_PATH = 'extension/'
 
 function Step({ done, n, children }: { done: boolean; n: number; children: React.ReactNode }) {
   return (
@@ -131,20 +129,22 @@ export function SetupDialog({ open, onClose }: { open: boolean; onClose: () => v
     >
       <ol className="flex flex-col gap-2.5 text-sm">
         <Step done={hasExtension === true} n={1}>
-          {EXTENSION_URL ? (
+          {hasExtension === true ? (
             <>
-              <a href={EXTENSION_URL} target="_blank" rel="noreferrer noopener">
-                Install the extension
-              </a>
-              {', then reload this page.'}
+              <strong>Bioplot Farm Reader</strong> is installed and answering on this page.
             </>
           ) : (
-            <>
-              The extension is not published yet. If you have a copy of it, load it by hand:{' '}
-              <code className="rounded bg-surface-2 px-1">chrome://extensions</code> → Developer
-              mode → Load unpacked →{' '}
-              <code className="rounded bg-surface-2 px-1">{REPO_EXTENSION_PATH}</code>
-            </>
+            <span className="flex flex-col items-start gap-2">
+              <span>
+                Add <strong>Bioplot Farm Reader</strong> from the Chrome Web Store, then reload
+                this page.
+              </span>
+              <ButtonLink href={EXTENSION_URL}>
+                Add to Chrome
+                <ExternalLink size={15} aria-hidden="true" className="text-muted" />
+                <span className="sr-only">(opens the Chrome Web Store in a new tab)</span>
+              </ButtonLink>
+            </span>
           )}
         </Step>
         <Step done={loaded} n={2}>
@@ -200,7 +200,13 @@ export function SetupDialog({ open, onClose }: { open: boolean; onClose: () => v
       {hasExtension === false ? (
         <p className="mt-3 flex items-start gap-2 text-sm text-muted">
           <X size={15} aria-hidden="true" className="mt-0.5 shrink-0 text-[color:var(--danger)]" />
-          Extension not detected on this page. Finish step 1, then reload this tab.
+          <span>
+            Extension not detected on this page.{' '}
+            <a href={EXTENSION_URL} target="_blank" rel="noreferrer noopener">
+              Install it from the Chrome Web Store
+            </a>
+            , or enable it if it is already installed, then reload this tab.
+          </span>
         </p>
       ) : null}
 
