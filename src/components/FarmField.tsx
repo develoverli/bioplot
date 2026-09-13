@@ -50,7 +50,7 @@ export function fieldMaxWidth(garden: Garden): string {
   return `calc(${FIELD_HEIGHT} * ${fieldAspectRatio(garden).toFixed(3)})`
 }
 
-function boundsOf(bed: GardenBed) {
+function boundsOf(bed: Pick<GardenBed, 'tiles'>) {
   let minX = Infinity
   let minY = Infinity
   let maxX = -Infinity
@@ -492,26 +492,35 @@ function renderBed(bed: GardenBed, ctx: FieldContext) {
   )
 }
 
-function renderDevice(device: GardenDevice, ctx: FieldContext) {
+/**
+ * The box a lamp is drawn over: the plots it lights, or its lit tiles when it lights none.
+ *
+ * Centring on the lit tiles themselves failed when the light spans two rows of plots: the top
+ * of the light starts inside the upper row, so the lamp landed on a crop. Pens are left out,
+ * since a lamp does nothing for animals.
+ */
+function lampBox(device: GardenDevice, beds: GardenBed[]) {
+  const lit = new Set(device.covered.map((tile) => `${tile.x},${tile.y}`))
+  const tiles = beds
+    .filter((bed) => !bed.isAnimal && bed.tiles.some((tile) => lit.has(`${tile.x},${tile.y}`)))
+    .flatMap((bed) => bed.tiles)
+  const source = tiles.length > 0 ? tiles : device.covered
+  return source.length > 0 ? boundsOf({ tiles: source }) : null
+}
+
+function renderDevice(device: GardenDevice, beds: GardenBed[], ctx: FieldContext) {
   const tile = device.tiles[0]
   if (!tile) return null
 
   /*
     A lamp hangs ABOVE what it lights, centred across it.
-    Centred on the coverage horizontally, it reads as belonging to all the lit plots
-    rather than to whichever one it touches. Lifted clear of the top of them, it stops
-    covering the very crops it is there to explain.
+    Centred on the lit plots horizontally, it reads as belonging to all of them rather than
+    to whichever one it touches. Lifted clear of the top of them, it stops covering the very
+    crops it is there to explain.
   */
-  let sx = 0
-  let top = Infinity
-  for (const covered of device.covered) {
-    sx += covered.x
-    top = Math.min(top, covered.y)
-  }
-  const lit = device.covered.length
-  const cx = ctx.originX + (lit > 0 ? sx / lit : tile.x) * CELL + CELL / 2
-  const above = lit > 0 ? top : tile.y
-  const cy = ctx.originY + above * CELL - CELL * 0.12
+  const box = lampBox(device, beds)
+  const cx = ctx.originX + (box ? box.x + box.w / 2 : tile.x + 0.5) * CELL
+  const cy = ctx.originY + (box ? box.y : tile.y) * CELL - CELL * 0.12
   const r = CELL * 0.52
 
   // The game ships art for every device. Its own lamp beats anything drawn here, so the
@@ -739,7 +748,7 @@ export function FarmField({
 
       {garden.beds.map((bed) => renderBed(bed, ctx))}
 
-      {garden.devices.map((device) => renderDevice(device, ctx))}
+      {garden.devices.map((device) => renderDevice(device, garden.beds, ctx))}
 
     </svg>
   )
