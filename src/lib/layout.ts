@@ -36,13 +36,13 @@ export interface LampPlacement {
   /** The tiles it actually lights, relative to (x, y). Not every box is filled. */
   offsets: Tile[]
   /**
-   * Where the lamp itself stands, relative to (x, y).
+   * The tiles the lamp itself stands on, relative to (x, y).
    *
-   * A lamp can stand on a tile it does not light, so this is allowed to fall outside the
-   * coverage box: negative, or past its width. Rounding it into the box would redraw the lamp
-   * somewhere it never was.
+   * A lamp can stand on tiles it does not light, so these are allowed to fall outside the
+   * coverage box: negative, or past its width. Rounding them into the box would redraw the lamp
+   * somewhere it never was. Empty when the capture did not say where the lamp stands.
    */
-  anchor: Tile
+  stand: Tile[]
 }
 
 export interface LampPlan {
@@ -96,8 +96,8 @@ interface Footprint {
   /** Lit tiles relative to the top-left of the box. */
   offsets: Tile[]
   keys: Set<string>
-  /** Where the lamp stands, relative to the same corner. */
-  anchor: Tile
+  /** The tiles the lamp stands on, relative to the same corner. */
+  stand: Tile[]
   /** Where that corner is on the land today, so an unmoved lamp can be recognised. */
   x: number
   y: number
@@ -110,7 +110,7 @@ function footprintOf(device: GardenDevice): Footprint {
     h: 1,
     offsets: [{ x: 0, y: 0 }],
     keys: new Set(['0,0']),
-    anchor: { x: 0, y: 0 },
+    stand: stood ? [{ x: 0, y: 0 }] : [],
     x: stood?.x ?? 0,
     y: stood?.y ?? 0,
   }
@@ -128,7 +128,6 @@ function footprintOf(device: GardenDevice): Footprint {
   }
 
   const offsets = device.covered.map((tile) => ({ x: tile.x - minX, y: tile.y - minY }))
-  const stand = device.tiles[0]
 
   return {
     w: maxX - minX + 1,
@@ -137,17 +136,38 @@ function footprintOf(device: GardenDevice): Footprint {
     keys: new Set(offsets.map((tile) => `${tile.x},${tile.y}`)),
     x: minX,
     y: minY,
-    // The real standing tile, even when it sits outside the coverage box: a lamp that lights
-    // the beds around it is often not on a lit tile itself, and clamping it into the box made
-    // the ideal view redraw an unmoved lamp one tile away. Drawing clamps to the land instead.
-    anchor: stand
-      ? { x: stand.x - minX, y: stand.y - minY }
-      : { x: Math.floor((maxX - minX) / 2), y: Math.floor((maxY - minY) / 2) },
+    // The real standing tiles, even when they sit outside the coverage box: a lamp that lights
+    // the beds around it is usually not on a lit tile itself, and clamping it into the box made
+    // the ideal view redraw an unmoved lamp one tile away. No stand is invented when the
+    // capture has none.
+    stand: device.tiles.map((tile) => ({ x: tile.x - minX, y: tile.y - minY })),
   }
 }
 
 function coversBed(tiles: Tile[], x: number, y: number, print: Footprint): boolean {
   return tiles.some((tile) => print.keys.has(`${tile.x - x},${tile.y - y}`))
+}
+
+/**
+ * Whether the lamp can stand with its box's top-left at (x, y).
+ *
+ * A lamp is an object on the land like a plot or a pen, so it needs free tiles to stand on.
+ * Scoring positions on light alone put suggested lamps on top of the very plots they were
+ * meant to light, a spot the game will never accept.
+ */
+function canStand(
+  garden: Garden,
+  occupied: Set<string>,
+  print: Footprint,
+  x: number,
+  y: number,
+): boolean {
+  return print.stand.every((tile) => {
+    const tx = x + tile.x
+    const ty = y + tile.y
+    const onLand = tx >= 0 && ty >= 0 && tx < garden.width && ty < garden.height
+    return onLand && !occupied.has(`${tx},${ty}`)
+  })
 }
 
 type SoilBed = Garden['beds'][number]
@@ -185,15 +205,20 @@ function gainAt(
   return gain
 }
 
-/** The position on the land where a lamp adds the most. */
+/**
+ * The position on the land where a lamp adds the most, among the ones it can stand in.
+ *
+ * With nowhere free to stand, the lamp stays where it is today: that spot is the game's own.
+ */
 function bestSpot(
   garden: Garden,
   soil: SoilBed[],
+  occupied: Set<string>,
   assignment: Map<string, LampRarity | null>,
   lamp: GardenDevice,
   print: Footprint,
   value: BedValueOf,
-): Spot | null {
+): Spot {
   let best: Spot | null = null
 
   /*
@@ -205,6 +230,7 @@ function bestSpot(
   const TIE = 1e-6
   for (let y = 0; y + print.h <= garden.height; y++) {
     for (let x = 0; x + print.w <= garden.width; x++) {
+      if (!canStand(garden, occupied, print, x, y)) continue
       const gain = gainAt(soil, assignment, lamp, print, x, y, value)
       const here = x === print.x && y === print.y
       if (best === null || gain > best.gain + TIE || (here && gain >= best.gain - TIE)) {
@@ -212,7 +238,14 @@ function bestSpot(
       }
     }
   }
-  return best
+  return (
+    best ?? {
+      x: print.x,
+      y: print.y,
+      gain: gainAt(soil, assignment, lamp, print, print.x, print.y, value),
+      here: true,
+    }
+  )
 }
 
 /** Records the lamp on every bed it lights that no stronger lamp already covers. */
@@ -254,14 +287,18 @@ export function planLamps(
 
   const placements: LampPlacement[] = []
 
+  // Every plot and pen takes up its tiles; each lamp placed takes up its own on top.
+  const occupied = new Set(
+    garden.beds.flatMap((bed) => bed.tiles.map((tile) => `${tile.x},${tile.y}`)),
+  )
+
   let movedLamps = 0
 
   for (const lamp of lamps) {
     const print = footprintOf(lamp)
     const { w, h } = print
-    const best = bestSpot(garden, soil, assignment, lamp, print, value)
+    const best = bestSpot(garden, soil, occupied, assignment, lamp, print, value)
 
-    if (!best) continue
     if (!best.here) movedLamps += 1
     placements.push({
       rarity: lamp.rarity,
@@ -270,9 +307,10 @@ export function planLamps(
       w,
       h,
       offsets: print.offsets,
-      anchor: print.anchor,
+      stand: print.stand,
     })
 
+    for (const tile of print.stand) occupied.add(`${best.x + tile.x},${best.y + tile.y}`)
     lightBeds(soil, assignment, lamp, print, best.x, best.y)
   }
 
@@ -292,20 +330,15 @@ export function planLamps(
 
 /** The same garden with the lamps where they should be, for planning and drawing. */
 export function applyLampPlan(garden: Garden, lampPlan: LampPlan): Garden {
-  // The anchor can sit outside the coverage box, so a lamp near an edge could be drawn off
-  // the land. Only the drawing is clamped; the tiles it lights are untouched.
-  const onLand = (tile: Tile): Tile => ({
-    x: Math.min(Math.max(tile.x, 0), Math.max(0, garden.width - 1)),
-    y: Math.min(Math.max(tile.y, 0), Math.max(0, garden.height - 1)),
-  })
-
+  // Only positions whose stand is on free land are chosen, so the tiles need no clamping.
   const devices: GardenDevice[] = lampPlan.placements.map((placement, index) => ({
     id: `suggested-${index}`,
     code: `${placement.rarity}_lamp_device`,
     rarity: placement.rarity,
-    tiles: [
-      onLand({ x: placement.x + placement.anchor.x, y: placement.y + placement.anchor.y }),
-    ],
+    tiles: placement.stand.map((tile) => ({
+      x: placement.x + tile.x,
+      y: placement.y + tile.y,
+    })),
     covered: placement.offsets.map((tile) => ({
       x: placement.x + tile.x,
       y: placement.y + tile.y,

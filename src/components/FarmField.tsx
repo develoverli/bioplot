@@ -492,35 +492,26 @@ function renderBed(bed: GardenBed, ctx: FieldContext) {
   )
 }
 
-/**
- * The box a lamp is drawn over: the plots it lights, or its lit tiles when it lights none.
- *
- * Centring on the lit tiles themselves failed when the light spans two rows of plots: the top
- * of the light starts inside the upper row, so the lamp landed on a crop. Pens are left out,
- * since a lamp does nothing for animals.
- */
-function lampBox(device: GardenDevice, beds: GardenBed[]) {
-  const lit = new Set(device.covered.map((tile) => `${tile.x},${tile.y}`))
-  const tiles = beds
-    .filter((bed) => !bed.isAnimal && bed.tiles.some((tile) => lit.has(`${tile.x},${tile.y}`)))
-    .flatMap((bed) => bed.tiles)
-  const source = tiles.length > 0 ? tiles : device.covered
-  return source.length > 0 ? boundsOf({ tiles: source }) : null
-}
-
 function renderDevice(device: GardenDevice, beds: GardenBed[], ctx: FieldContext) {
-  const tile = device.tiles[0]
-  if (!tile) return null
+  if (device.tiles.length === 0) return null
 
   /*
-    A lamp hangs ABOVE what it lights, centred across it.
-    Centred on the lit plots horizontally, it reads as belonging to all of them rather than
-    to whichever one it touches. Lifted clear of the top of them, it stops covering the very
-    crops it is there to explain.
+    A lamp is drawn on the row it stands on: the game's own placement in the live view, the
+    suggested one in the ideal view. Anchoring it to the plots it lights hid every move that
+    kept the top row lit, so the ideal looked unchanged while the light had shifted.
+
+    Across, it is centred on the plots it lights. The tile it stands on sits a little off the
+    middle of the gap between two plots, which read as the lamp belonging to one of them.
+    Pens are left out, since a lamp does nothing for animals.
   */
-  const box = lampBox(device, beds)
-  const cx = ctx.originX + (box ? box.x + box.w / 2 : tile.x + 0.5) * CELL
-  const cy = ctx.originY + (box ? box.y : tile.y) * CELL - CELL * 0.12
+  const stand = boundsOf({ tiles: device.tiles })
+  const lit = new Set(device.covered.map((tile) => `${tile.x},${tile.y}`))
+  const litTiles = beds
+    .filter((bed) => !bed.isAnimal && bed.tiles.some((tile) => lit.has(`${tile.x},${tile.y}`)))
+    .flatMap((bed) => bed.tiles)
+  const across = litTiles.length > 0 ? boundsOf({ tiles: litTiles }) : stand
+  const cx = ctx.originX + (across.x + across.w / 2) * CELL
+  const cy = ctx.originY + (stand.y + stand.h / 2) * CELL
   const r = CELL * 0.52
 
   // The game ships art for every device. Its own lamp beats anything drawn here, so the

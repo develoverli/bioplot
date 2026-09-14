@@ -131,6 +131,52 @@ describe('a lamp that stands off its own coverage', () => {
   })
 })
 
+describe('a lamp never stands on a plot', () => {
+  /**
+   * Two legendary plots side by side on the bottom row, and a common plot right where the lamp
+   * would have to stand to light both. The lamp stands one tile above the left end of its light.
+   */
+  function garden(): Garden {
+    return {
+      code: 'free_garden',
+      landId: 'sunny-field',
+      width: 4,
+      height: 3,
+      beds: [
+        bed('left', 1, 2),
+        bed('right', 2, 2),
+        { ...bed('blocker', 1, 1), rarity: 'common' },
+      ],
+      devices: [
+        {
+          id: 'lamp',
+          code: 'rare_lamp_device',
+          rarity: 'rare',
+          tiles: [{ x: 2, y: 0 }],
+          covered: [
+            { x: 2, y: 1 },
+            { x: 3, y: 1 },
+          ],
+        },
+      ],
+    }
+  }
+
+  it('gives up the best light rather than stand where the game cannot place it', () => {
+    const live = garden()
+    const plan = planLamps(live, 86_400, seeds)
+    const ideal = applyLampPlan(live, plan)
+
+    const taken = new Set(live.beds.flatMap((item) => item.tiles.map((t) => `${t.x},${t.y}`)))
+    for (const tile of ideal.devices[0]!.tiles) {
+      expect(taken.has(`${tile.x},${tile.y}`)).toBe(false)
+    }
+    // Lighting both legendaries needs the blocked tile, so at most one of them is lit.
+    const lit = [plan.assignment.get('left'), plan.assignment.get('right')].filter(Boolean)
+    expect(lit).toHaveLength(1)
+  })
+})
+
 describe('a lamp that is already where it should be', () => {
   /** A lamp three tiles wide over a single bed: three positions light it, all worth the same. */
   function garden(): Garden {
