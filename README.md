@@ -14,6 +14,14 @@ animals out of your own browser, and tells you exactly what to plant to bank the
 Unofficial. Not affiliated with, endorsed by, or connected to Chainers.
 
 <p align="center">
+  <video src="https://github.com/user-attachments/assets/8f0e50ff-a658-47c4-bedd-83f7904c5056" width="880" controls muted loop playsinline>
+    <a href="https://github.com/user-attachments/assets/8f0e50ff-a658-47c4-bedd-83f7904c5056">Watch the fifty-second tour</a>
+  </video>
+  <br>
+  <sub>Fifty seconds: the farm drawn bed by bed, one bed's whole schedule, and the plan rewritten for how often you actually play.</sub>
+</p>
+
+<p align="center">
   <img src="docs/media/app.webp" alt="The Bioplot planner: planning window and seeds on the left, the farm in the middle, the farm summary on the right" width="880">
   <br>
   <sub>Inputs on the left, the farm in the middle, what the day is worth on the right. Shown before a farm is loaded.</sub>
