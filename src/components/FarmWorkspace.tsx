@@ -10,6 +10,7 @@ import {
   type FeedReport,
 } from '../lib/feed'
 import { lands } from '../lib/catalog'
+import { splitLampCode } from '../lib/inventory'
 import { formatBiopoints, formatDuration, formatExact, titleCase } from '../lib/format'
 import { applyLampPlan, inventoryWith, planLamps, type LampPlan } from '../lib/layout'
 import {
@@ -391,6 +392,27 @@ function SelectedAnimal({ bedId }: { bedId: string }) {
   )
 }
 
+/**
+ * The lamp line under a bed. A lamp the model cannot weigh is named with its rarity, colour
+ * plus word, and flagged, so the player knows why the plan reads as if the bed were unlit.
+ */
+function BedLampLabel({ bed }: { bed: GardenBed }) {
+  if (bed.unmodelledLamp) {
+    const { rarity, name } = splitLampCode(bed.unmodelledLamp)
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs text-muted">
+        {rarity ? <RarityBadge rarity={rarity} /> : null}
+        {name} · bonus not modelled yet
+      </span>
+    )
+  }
+  return (
+    <span className="text-xs text-muted">
+      {bed.lamp ? `${titleCase(bed.lamp)} lamp` : 'no lamp'}
+    </span>
+  )
+}
+
 function SelectedBed({
   garden,
   planByBed,
@@ -425,9 +447,7 @@ function SelectedBed({
 
       <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
         <RarityBadge rarity={bed.rarity} />
-        <span className="text-xs text-muted">
-          {bed.lamp ? `${titleCase(bed.lamp)} lamp` : 'no lamp'}
-        </span>
+        <BedLampLabel bed={bed} />
       </div>
 
       <p className="tabular mt-1 text-xs text-faint">

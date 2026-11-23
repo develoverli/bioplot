@@ -100,7 +100,13 @@ export interface GardenBed {
   /** An animal pen rather than soil: it takes feed, not crops. */
   isAnimal: boolean
   tiles: Tile[]
+  /** The phytolamp the yield model counts. Null under no lamp or under one it cannot model. */
   lamp: LampRarity | null
+  /**
+   * Item code of a lamp that lights this bed but has no known stats yet ("epic_aqualamp").
+   * The plan treats such a bed as unlit: promising a bonus nobody has measured breaks rule 4.
+   */
+  unmodelledLamp: string | null
   plantedSeedCode: string | null
 }
 
@@ -108,7 +114,8 @@ export interface GardenDevice {
   id: string
   /** The item code, e.g. "uncommon_lamp_device", for looking up its art. */
   code: string
-  rarity: LampRarity
+  /** Any rarity: aqualamps and mirror lamps go up to legendary. See `isModelledLamp`. */
+  rarity: Rarity
   tiles: Tile[]
   covered: Tile[]
 }

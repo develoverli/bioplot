@@ -1,6 +1,7 @@
 import type { KeyboardEvent } from 'react'
 import type { IconLookup } from '../lib/artwork'
 import { titleCase } from '../lib/format'
+import { splitLampCode } from '../lib/inventory'
 import type { PlanEntry, PlotPlan } from '../lib/optimizer'
 import type { Garden, GardenBed, GardenDevice, Rarity } from '../lib/types'
 
@@ -151,8 +152,23 @@ function activateOnKey(event: KeyboardEvent<SVGGElement>, activate: () => void) 
   activate()
 }
 
+/** ", under an epic aqualamp (bonus not modelled yet)" or ", rare lamp", for a soil bed. */
+function bedLampText(bed: GardenBed): string {
+  if (bed.isAnimal) return ''
+  if (bed.unmodelledLamp) {
+    const { rarity, name } = splitLampCode(bed.unmodelledLamp)
+    const label = rarity ? `${rarity} ${name}` : name
+    return `, under ${/^[aeiou]/i.test(label) ? 'an' : 'a'} ${label} (bonus not modelled yet)`
+  }
+  return bed.lamp ? `, ${bed.lamp} lamp` : ''
+}
+
 function bedAriaLabel(bed: GardenBed, headline: PlanEntry | null): string {
-  const lamp = bed.lamp ? ` under a ${bed.lamp} lamp` : ''
+  const lamp = bed.unmodelledLamp
+    ? bedLampText(bed)
+    : bed.lamp
+      ? ` under a ${bed.lamp} lamp`
+      : ''
   const plant = headline ? `, plant ${headline.seedName} ${headline.plantings} times` : ''
   return `${titleCase(bed.rarity)} ${bed.isAnimal ? bed.kind : 'plot'}${lamp}${plant}`
 }
@@ -161,7 +177,7 @@ function renderBedTitle(bed: GardenBed, headline: PlanEntry | null) {
   return (
     <title>
       {titleCase(bed.rarity)} {bed.isAnimal ? bed.kind.replace(/_/g, ' ') : 'plot'}
-      {bed.lamp && !bed.isAnimal ? `, ${bed.lamp} lamp` : ''}
+      {bedLampText(bed)}
       {headline ? ` — plant ${headline.seedName} ×${headline.plantings}` : ''}
     </title>
   )
@@ -522,7 +538,8 @@ function renderDevice(device: GardenDevice, beds: GardenBed[], ctx: FieldContext
   return (
     <g key={device.id} shapeRendering="auto">
       <title>
-        {titleCase(device.rarity)} phytolamp, lighting {device.covered.length} tile
+        {titleCase(device.rarity)} {device.code ? splitLampCode(device.code).name : 'phytolamp'},
+        lighting {device.covered.length} tile
         {device.covered.length === 1 ? '' : 's'}
       </title>
 

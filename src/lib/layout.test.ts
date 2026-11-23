@@ -11,6 +11,7 @@ function bed(id: string, x: number, y: number): GardenBed {
     isAnimal: false,
     tiles: [{ x, y }],
     lamp: null,
+    unmodelledLamp: null,
     plantedSeedCode: null,
   }
 }
@@ -90,6 +91,52 @@ describe('planLamps', () => {
     expect(stand.x).toBeLessThan(field.width)
     expect(stand.y).toBeGreaterThanOrEqual(0)
     expect(stand.y).toBeLessThan(field.height)
+  })
+})
+
+describe('a lamp the model cannot weigh', () => {
+  /** A legendary bed under an epic aqualamp, and a free phytolamp elsewhere on the land. */
+  function field(): Garden {
+    const lit = { ...bed('aqua-bed', 0, 0), unmodelledLamp: 'epic_aqualamp' }
+    return {
+      code: 'tranquil_waters',
+      landId: 'tranquil-waters',
+      width: 6,
+      height: 6,
+      beds: [lit, bed('open', 4, 4)],
+      devices: [
+        {
+          id: 'aqua',
+          code: 'epic_aqualamp',
+          rarity: 'epic',
+          tiles: [{ x: 1, y: 0 }],
+          covered: [{ x: 0, y: 0 }],
+        },
+        {
+          id: 'phyto',
+          code: 'rare_lamp_device',
+          rarity: 'rare',
+          tiles: [{ x: 5, y: 5 }],
+          covered: [{ x: 4, y: 4 }],
+        },
+      ],
+    }
+  }
+
+  it('is never moved and stays in the drawing', () => {
+    const live = field()
+    const ideal = applyLampPlan(live, planLamps(live, 86_400, seeds))
+    const aqua = ideal.devices.find((device) => device.code === 'epic_aqualamp')
+
+    expect(aqua).toEqual(live.devices[0])
+  })
+
+  it('keeps phytolamps off the bed it lights', () => {
+    const plan = planLamps(field(), 86_400, seeds)
+
+    expect(plan.assignment.has('aqua-bed')).toBe(false)
+    expect(plan.placements).toHaveLength(1)
+    expect(plan.placements[0]?.rarity).toBe('rare')
   })
 })
 

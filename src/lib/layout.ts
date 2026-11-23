@@ -1,4 +1,4 @@
-import { emptyInventory } from './inventory'
+import { emptyInventory, isModelledLamp } from './inventory'
 import { optimize } from './optimizer'
 import type {
   Garden,
@@ -10,7 +10,7 @@ import type {
   Seed,
   Tile,
 } from './types'
-import { RARITIES } from './types'
+import { LAMP_RARITIES, RARITIES } from './types'
 
 /**
  * Where the lamps should go.
@@ -144,6 +144,17 @@ function footprintOf(device: GardenDevice): Footprint {
   }
 }
 
+type Phytolamp = GardenDevice & { rarity: LampRarity }
+
+/**
+ * A lamp the plan may move and weigh. A device saved before codes were captured has no code;
+ * back then only phytolamps were read, so its rarity alone decides.
+ */
+function isPhytolamp(device: GardenDevice): device is Phytolamp {
+  if (device.code === '') return (LAMP_RARITIES as readonly string[]).includes(device.rarity)
+  return isModelledLamp(device.code)
+}
+
 function coversBed(tiles: Tile[], x: number, y: number, print: Footprint): boolean {
   return tiles.some((tile) => print.keys.has(`${tile.x - x},${tile.y - y}`))
 }
@@ -180,7 +191,7 @@ interface Spot {
 }
 
 /** True when the bed already has a lamp at least as strong as this one. */
-function coveredByStronger(already: LampRarity | null, lamp: GardenDevice): boolean {
+function coveredByStronger(already: LampRarity | null, lamp: Phytolamp): boolean {
   return already !== null && RARITIES.indexOf(already) >= RARITIES.indexOf(lamp.rarity)
 }
 
@@ -188,7 +199,7 @@ function coveredByStronger(already: LampRarity | null, lamp: GardenDevice): bool
 function gainAt(
   soil: SoilBed[],
   assignment: Map<string, LampRarity | null>,
-  lamp: GardenDevice,
+  lamp: Phytolamp,
   print: Footprint,
   x: number,
   y: number,
@@ -215,7 +226,7 @@ function bestSpot(
   soil: SoilBed[],
   occupied: Set<string>,
   assignment: Map<string, LampRarity | null>,
-  lamp: GardenDevice,
+  lamp: Phytolamp,
   print: Footprint,
   value: BedValueOf,
 ): Spot {
@@ -252,7 +263,7 @@ function bestSpot(
 function lightBeds(
   soil: SoilBed[],
   assignment: Map<string, LampRarity | null>,
-  lamp: GardenDevice,
+  lamp: Phytolamp,
   print: Footprint,
   x: number,
   y: number,
@@ -276,21 +287,26 @@ export function planLamps(
   const value = (rarity: Rarity, lamp: LampRarity | null) =>
     bedValue(cache, rarity, lamp, garden.landId, horizonSec, catalogue, mode, checkEverySec)
 
-  const lamps = [...garden.devices].sort(
-    (a, b) => RARITIES.indexOf(b.rarity) - RARITIES.indexOf(a.rarity),
-  )
+  // Only phytolamps are moved. A lamp the model has no stats for stays exactly where it is.
+  const lamps = garden.devices
+    .filter(isPhytolamp)
+    .sort((a, b) => RARITIES.indexOf(b.rarity) - RARITIES.indexOf(a.rarity))
 
   const assignment = new Map<string, LampRarity | null>()
-  // Lamps do nothing for animals, so they play no part in where lamps should go.
-  const soil = garden.beds.filter((bed) => !bed.isAnimal)
+  // Lamps do nothing for animals, so they play no part in where lamps should go. A bed under
+  // an unmodelled lamp is left out too: which lamp the game applies there is unknown.
+  const soil = garden.beds.filter((bed) => !bed.isAnimal && bed.unmodelledLamp === null)
   for (const bed of soil) assignment.set(bed.id, null)
 
   const placements: LampPlacement[] = []
 
-  // Every plot and pen takes up its tiles; each lamp placed takes up its own on top.
-  const occupied = new Set(
-    garden.beds.flatMap((bed) => bed.tiles.map((tile) => `${tile.x},${tile.y}`)),
-  )
+  // Every plot, pen and unmoved lamp takes up its tiles; each lamp placed takes up its own on top.
+  const occupied = new Set([
+    ...garden.beds.flatMap((bed) => bed.tiles.map((tile) => `${tile.x},${tile.y}`)),
+    ...garden.devices
+      .filter((device) => !isPhytolamp(device))
+      .flatMap((device) => device.tiles.map((tile) => `${tile.x},${tile.y}`)),
+  ])
 
   let movedLamps = 0
 
@@ -331,7 +347,7 @@ export function planLamps(
 /** The same garden with the lamps where they should be, for planning and drawing. */
 export function applyLampPlan(garden: Garden, lampPlan: LampPlan): Garden {
   // Only positions whose stand is on free land are chosen, so the tiles need no clamping.
-  const devices: GardenDevice[] = lampPlan.placements.map((placement, index) => ({
+  const suggested: GardenDevice[] = lampPlan.placements.map((placement, index) => ({
     id: `suggested-${index}`,
     code: `${placement.rarity}_lamp_device`,
     rarity: placement.rarity,
@@ -347,7 +363,8 @@ export function applyLampPlan(garden: Garden, lampPlan: LampPlan): Garden {
 
   return {
     ...garden,
-    devices,
+    // Lamps the plan never moves are still on the land, so they stay in the drawing.
+    devices: [...suggested, ...garden.devices.filter((device) => !isPhytolamp(device))],
     beds: garden.beds.map((bed) => ({
       ...bed,
       lamp: lampPlan.assignment.get(bed.id) ?? null,

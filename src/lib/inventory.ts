@@ -7,7 +7,9 @@ import {
   emptyPools,
   type Catalogue,
   type Garden,
+  type GardenDevice,
   type Inventory,
+  type LampRarity,
   type PlotGroup,
   type Rarity,
 } from './types'
@@ -31,32 +33,111 @@ export const plotGroupSchema = z.object({
 
 const tileSchema = z.object({ x: z.number().int(), y: z.number().int() })
 
-export const gardenSchema = z.object({
+const gardenBedBaseSchema = z.object({
+  id: z.string(),
+  rarity: raritySchema,
+  kind: z.string(),
+  isAnimal: z.boolean().default(false),
+  tiles: z.array(tileSchema),
+  plantedSeedCode: z.string().nullable(),
+})
+
+const gardenDeviceSchema = z.object({
+  id: z.string(),
+  code: z.string().default(''),
+  // Any rarity: an epic aqualamp is a real device, and rejecting it threw away the whole farm.
+  rarity: raritySchema,
+  tiles: z.array(tileSchema),
+  covered: z.array(tileSchema),
+})
+
+const gardenFrameSchema = z.object({
   code: z.string(),
   landId: z.string(),
   width: z.number().int().min(1).max(200),
   height: z.number().int().min(1).max(200),
-  beds: z.array(
-    z.object({
-      id: z.string(),
-      rarity: raritySchema,
-      kind: z.string(),
-      isAnimal: z.boolean().default(false),
-      tiles: z.array(tileSchema),
-      lamp: lampSchema.nullable(),
-      plantedSeedCode: z.string().nullable(),
-    }),
-  ),
-  devices: z.array(
-    z.object({
-      id: z.string(),
-      code: z.string().default(''),
-      rarity: lampSchema,
-      tiles: z.array(tileSchema),
-      covered: z.array(tileSchema),
-    }),
-  ),
 })
+
+/** A garden as the app keeps it, with each bed's lamp already resolved by `resolveBedLamps`. */
+export const gardenSchema = gardenFrameSchema.extend({
+  beds: z.array(
+    gardenBedBaseSchema.extend({
+      lamp: lampSchema.nullable(),
+      unmodelledLamp: z.string().nullable().default(null),
+    }),
+  ),
+  devices: z.array(gardenDeviceSchema),
+})
+
+/**
+ * A garden as the extension sends it. Its per-bed `lamp` is only the strongest rarity in
+ * reach, with no family, so it is accepted as any string and recomputed from the devices.
+ */
+const importGardenSchema = gardenFrameSchema.extend({
+  beds: z.array(gardenBedBaseSchema.extend({ lamp: z.string().nullable() })),
+  devices: z.array(gardenDeviceSchema),
+})
+
+const MODELLED_LAMP_CODE = /^(common|uncommon|rare)_lamp_device$/
+
+/**
+ * True for the lamps the yield model has stats for: phytolamps, common to rare.
+ *
+ * Aqualamps, mirror lamps, dark mirror lamps, and every epic or legendary lamp only report a
+ * growth-time modifier in the game catalogue; their critical multiplier and upgrade chance
+ * are unknown, so they are not modelled rather than guessed.
+ */
+export function isModelledLamp(code: string): boolean {
+  return MODELLED_LAMP_CODE.test(code)
+}
+
+/** "epic_aqualamp" -> { rarity: "epic", name: "aqualamp" }, for labelling a lamp. */
+export function splitLampCode(code: string): { rarity: Rarity | null; name: string } {
+  const [head = '', ...rest] = code.split('_')
+  const rarity = (RARITIES as readonly string[]).includes(head) ? (head as Rarity) : null
+  const name = (rarity ? rest : [head, ...rest]).join(' ')
+  return { rarity, name: name === 'lamp device' ? 'phytolamp' : name }
+}
+
+type ImportGarden = z.infer<typeof importGardenSchema>
+
+/**
+ * Decides, per bed, which lamp the plan may count.
+ *
+ * The extension only says "the strongest rarity in reach", so a rare aqualamp read as a rare
+ * phytolamp and promised its 15% speed-up and ×2.35 criticals. Recomputing from the devices
+ * fixes that. When a lamp the model cannot weigh reaches a bed, the bed is planned as unlit
+ * even if a phytolamp also reaches it: lamps do not stack and the game does not say which
+ * one wins, so the only safe promise is none.
+ */
+export function resolveBedLamps(garden: ImportGarden): Garden {
+  const strongest = <T extends GardenDevice>(list: T[]): T | null =>
+    list.reduce<T | null>(
+      (best, device) =>
+        best === null || RARITIES.indexOf(device.rarity) > RARITIES.indexOf(best.rarity)
+          ? device
+          : best,
+      null,
+    )
+
+  return {
+    ...garden,
+    devices: garden.devices,
+    beds: garden.beds.map((bed) => {
+      const keys = new Set(bed.tiles.map((tile) => `${tile.x},${tile.y}`))
+      const reaching = garden.devices.filter((device) =>
+        device.covered.some((tile) => keys.has(`${tile.x},${tile.y}`)),
+      )
+      const unknown = strongest(reaching.filter((device) => !isModelledLamp(device.code)))
+      const known = strongest(reaching.filter((device) => isModelledLamp(device.code)))
+      return {
+        ...bed,
+        lamp: unknown === null && known !== null ? (known.rarity as LampRarity) : null,
+        unmodelledLamp: unknown?.code ?? null,
+      }
+    }),
+  }
+}
 
 const catalogueEntrySchema = z.object({
   code: z.string(),
@@ -214,7 +295,7 @@ export const importPayloadSchema = z.object({
     )
     .default([]),
   // Present when the real layout was captured; drives the farm map.
-  gardens: z.array(gardenSchema).default([]),
+  gardens: z.array(importGardenSchema).default([]),
   // The game's own numbers and art, when the catalogues were captured.
   catalogue: catalogueSchema.default(emptyCatalogue),
   items: z.array(inventoryItemSchema).default([]),
@@ -298,10 +379,12 @@ export function fromImportPayload(payload: ImportPayload): ImportResult {
     plotGroups.set(key, (plotGroups.get(key) ?? 0) + Math.floor(row.count))
   }
 
-  const gardens: Garden[] = (payload.gardens ?? []).map((garden) => ({
-    ...garden,
-    landId: landIds.has(garden.landId) ? garden.landId : defaultLandId,
-  }))
+  const gardens: Garden[] = (payload.gardens ?? []).map((garden) =>
+    resolveBedLamps({
+      ...garden,
+      landId: landIds.has(garden.landId) ? garden.landId : defaultLandId,
+    }),
+  )
 
   // The layout, when present, is the better source: it knows which lamp covers which bed.
   const plots = gardens.length > 0 ? plotsFromGardens(gardens) : undefined

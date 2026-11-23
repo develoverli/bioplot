@@ -18,6 +18,7 @@ function garden(): Garden {
         isAnimal: true,
         tiles: [{ x: 0, y: 0 }],
         lamp: null,
+        unmodelledLamp: null,
         plantedSeedCode: null,
       },
     ],
