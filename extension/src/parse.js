@@ -204,6 +204,13 @@
    * devices all matter for feeding and crafting, and guessing which ones to drop here would
    * mean re-capturing later.
    */
+  /**
+   * The game renamed `itemType` from plural to singular (`farmSeeds` -> `farmSeed`, seen
+   * 2026-11-22). Both spellings are accepted so captures stored before the rename still read.
+   */
+  const SEED_ITEM_TYPES = new Set(['farmSeeds', 'farmSeed'])
+  const BED_ITEM_TYPES = new Set(['farmBeds', 'farmBed'])
+
   /** One active, non-empty inventory row with its code split, or null when it is skipped. */
   function inventoryRow(item) {
     if (item?.inventoryType && item.inventoryType !== 'active') return null
@@ -233,9 +240,9 @@
       items.push({ itemType, code, rarity: rarity ?? null, name: rest, count })
 
       if (!rarity) continue
-      if (itemType === 'farmSeeds') {
+      if (SEED_ITEM_TYPES.has(itemType)) {
         seeds.push({ seedId: seedIdFor(rest), name: rest, rarity, count })
-      } else if (itemType === 'farmBeds') {
+      } else if (BED_ITEM_TYPES.has(itemType)) {
         spareBeds.push({ rarity, count })
       }
     }

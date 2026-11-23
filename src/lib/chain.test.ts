@@ -293,6 +293,24 @@ describe('harvestWeight', () => {
     expect(result.weight).toBe(21)
     expect(result.unknown).toEqual(['Moon Rock'])
   })
+
+  it('weighs produce under the singular itemType the game switched to', () => {
+    const { byCode } = buildWeightLookups({
+      ...emptyCatalogue,
+      vegetables: [
+        { code: 'common_corn', rarity: 'common', name: 'corn', biopoints: 7, growthSec: null, image: null },
+      ],
+    })
+    const result = harvestWeight(
+      [
+        { itemType: 'farmVegetable', code: 'common_corn', rarity: 'common', name: 'Corn', count: 2 },
+        { itemType: 'farmSeed', code: 'common_corn_seeds', rarity: 'common', name: 'Corn seeds', count: 9 },
+      ],
+      byCode,
+    )
+    expect(result.weight).toBe(14)
+    expect(result.unknown).toEqual([])
+  })
 })
 
 describe('estimateEarnings', () => {

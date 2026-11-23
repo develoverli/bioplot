@@ -235,9 +235,15 @@ export function buildWeightLookups(catalogue: Catalogue): WeightLookups {
 }
 
 /**
+ * The game renamed `itemType` from plural to singular (`farmVegetables` -> `farmVegetable`,
+ * seen 2026-11-22). Both spellings are accepted so captures stored before the rename still read.
+ */
+const PRODUCE_ITEM_TYPES: ReadonlySet<string> = new Set(['farmVegetables', 'farmVegetable'])
+
+/**
  * The harvest sitting in the bag, in biopoints: what a player could send to a pool right now.
  *
- * Only produce counts (`farmVegetables`); seeds, feed and fertilizer cannot be contributed.
+ * Only produce counts (`farmVegetable`); seeds, feed and fertilizer cannot be contributed.
  * Produce the catalogue cannot weigh is left out and named, never estimated.
  */
 export function harvestWeight(
@@ -247,7 +253,7 @@ export function harvestWeight(
   let weight = 0
   const unknown = new Set<string>()
   for (const item of items) {
-    if (item.itemType !== 'farmVegetables' || item.count <= 0) continue
+    if (!PRODUCE_ITEM_TYPES.has(item.itemType) || item.count <= 0) continue
     const each = weightOfCode(item.code)
     if (each === null) unknown.add(item.name || item.code)
     else weight += each * item.count

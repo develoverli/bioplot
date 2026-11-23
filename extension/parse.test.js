@@ -191,6 +191,21 @@ describe('readInventory', () => {
     expect(seeds.some((seed) => seed.count === 99)).toBe(false)
     expect(spareBeds).toEqual([{ rarity: 'rare', count: 4 }])
   })
+
+  it('reads the singular itemType the game switched to', () => {
+    const { seeds, spareBeds } = readInventory({
+      success: true,
+      data: {
+        items: [
+          { inventoryType: 'active', itemType: 'farmSeed', itemCode: 'legendary_corn_seeds', count: 2 },
+          { inventoryType: 'active', itemType: 'farmBed', itemCode: 'epic_vegetable_plot', count: 1 },
+          { inventoryType: 'active', itemType: 'farmVegetable', itemCode: 'legendary_corn', count: 50 },
+        ],
+      },
+    })
+    expect(seeds).toEqual([{ seedId: 'corn-seed', name: 'corn_seeds', rarity: 'legendary', count: 2 }])
+    expect(spareBeds).toEqual([{ rarity: 'epic', count: 1 }])
+  })
 })
 
 describe('readGardens', () => {

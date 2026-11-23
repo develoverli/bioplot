@@ -241,6 +241,11 @@ hour "best" below six settled blocks.
 `itemType` values seen: `farmSeeds`, `farmBeds`, `farmDevices`, `farmFertilizers`,
 `farmVegetables`, `farmRobots`.
 
+**Renamed to singular (seen 2026-11-22):** `/api/farm/user/inventory` now answers `farmSeed`,
+`farmBed`, `farmVegetable` (robot slots, harvest rewards and recipes use the same spelling).
+An exact match on the plural silently read zero seeds, so `parse.js` and `harvestWeight()` in
+`src/lib/chain.ts` accept both spellings: captures stored before the rename must still read.
+
 A garden's `placedDevices[].coveredCoordinates` is how lamp coverage is determined: a bed is
 lit when any tile in its `placementCoordinates` falls inside a lamp's covered tiles.
 
