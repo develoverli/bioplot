@@ -14,6 +14,7 @@ const site = SITE_URL.replace(/\/$/, '')
 
 let captures = []
 let seen = {}
+let recipes = null
 let payload = null
 
 function status(message) {
@@ -77,6 +78,18 @@ function render() {
     ? `Last capture ${new Date(Math.max(...captures.map((capture) => capture.at))).toLocaleTimeString()}`
     : ''
 
+  // The game pages recipes, so the book fills as the Workshop is scrolled. Saying how far it
+  // got tells the player whether the seed assistant is working from all of them.
+  const known = recipes?.offers?.length ?? 0
+  const total = recipes?.total ?? 0
+  let recipeLine = ''
+  if (known > 0 && total > known) {
+    recipeLine = `Recipes ${known} / ${total}: scroll the Workshop to the end for the rest`
+  } else if (known > 0) {
+    recipeLine = `Recipes ${known}`
+  }
+  el('recipes').textContent = recipeLine
+
   const hasAnything = captures.length > 0 || Object.keys(seen).length > 0
   const hasFarm = Boolean(payload) && (payload.seeds.length > 0 || payload.plots.length > 0)
 
@@ -103,7 +116,8 @@ function load() {
   globalThis.chrome.runtime.sendMessage({ type: 'get' }, (response) => {
     captures = Array.isArray(response?.captures) ? response.captures : []
     seen = response?.seen && typeof response.seen === 'object' ? response.seen : {}
-    payload = captures.length ? globalThis.BioplotParse.toPayload(captures) : null
+    recipes = response?.recipes ?? null
+    payload = captures.length ? globalThis.BioplotParse.toPayload(captures, recipes) : null
     render()
   })
 }
@@ -128,6 +142,7 @@ el('clear').addEventListener('click', () => {
   globalThis.chrome.runtime.sendMessage({ type: 'clear' }, () => {
     captures = []
     seen = {}
+    recipes = null
     payload = null
     render()
     status('Cleared. Reload the farm page in chainers.io to capture again.')

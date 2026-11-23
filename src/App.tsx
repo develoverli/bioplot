@@ -1,5 +1,5 @@
 import { useDeferredValue, useEffect, useMemo, useState } from 'react'
-import { Coins, LayoutGrid, ListOrdered, PawPrint, PlugZap, Table2 } from 'lucide-react'
+import { Coins, LayoutGrid, ListOrdered, PawPrint, PlugZap, Sprout, Table2 } from 'lucide-react'
 import { EmptyHero } from './components/EmptyHero'
 import { FarmWorkspace } from './components/FarmWorkspace'
 import { FeedPanel } from './components/FeedPanel'
@@ -9,6 +9,7 @@ import { PlotsCard } from './components/InventoryPanel'
 import { PlanPanel } from './components/PlanPanel'
 import { PoolsPanel } from './components/PoolsPanel'
 import { RankingPanel } from './components/RankingPanel'
+import { SeedAdvicePanel } from './components/SeedAdvicePanel'
 import { SeedsCard } from './components/SeedsCard'
 import { SettingsCard } from './components/SettingsCard'
 import { SetupDialog } from './components/SetupDialog'
@@ -19,10 +20,11 @@ import { attendanceSec } from './lib/attendance'
 import { buildEffectiveSeeds } from './lib/effective'
 import { CONTACT_URL, EXTENSION_URL, PRIVACY_URL, TERMS_URL } from './lib/links'
 import { optimize, type Plan } from './lib/optimizer'
+import { buildSeedAdvice, type SeedAdvice } from './lib/seedAdvice'
 import type { PlotGroup, Seed } from './lib/types'
 import { useStore, type ThemeChoice } from './store'
 
-type Tab = 'farm' | 'schedule' | 'ranking' | 'animals' | 'pools'
+type Tab = 'farm' | 'schedule' | 'ranking' | 'seeds' | 'animals' | 'pools'
 
 const PANEL_CLASS = 'rounded-2xl border border-line bg-surface p-3.5 shadow-[var(--shadow-2)]'
 
@@ -39,11 +41,23 @@ function applyTheme(theme: ThemeChoice) {
  * permanent space next to the field. The counts on the labels are what make a closed tab
  * worth opening.
  */
-function buildTabs(hungry: number, livePools: number): TabItem<Tab>[] {
+function buildTabs(hungry: number, livePools: number, advice: SeedAdvice): TabItem<Tab>[] {
+  // Missing seeds are the part worth acting on, so they win the badge over plain merges.
+  let seedBadge: string | undefined
+  if (advice.missing.length > 0) seedBadge = `${advice.missing.length} missing`
+  else if (advice.merges.length > 0) seedBadge = `${advice.merges.length} to merge`
+
   return [
     { id: 'farm', label: 'Farm', icon: <LayoutGrid size={15} aria-hidden="true" /> },
     { id: 'schedule', label: 'Schedule', icon: <Table2 size={15} aria-hidden="true" /> },
     { id: 'ranking', label: 'Ranking', icon: <ListOrdered size={15} aria-hidden="true" /> },
+    {
+      id: 'seeds',
+      label: 'Seeds',
+      icon: <Sprout size={15} aria-hidden="true" />,
+      badge: seedBadge,
+      badgeTone: advice.missing.length > 0 ? 'warning' : 'neutral',
+    },
     {
       id: 'animals',
       label: 'Animals',
@@ -61,7 +75,13 @@ function buildTabs(hungry: number, livePools: number): TabItem<Tab>[] {
   ]
 }
 
-function renderPanel(tab: Tab, plan: Plan, horizonSec: number, catalogue: Seed[]) {
+function renderPanel(
+  tab: Tab,
+  plan: Plan,
+  horizonSec: number,
+  catalogue: Seed[],
+  advice: SeedAdvice,
+) {
   switch (tab) {
     case 'schedule':
       return (
@@ -73,6 +93,12 @@ function renderPanel(tab: Tab, plan: Plan, horizonSec: number, catalogue: Seed[]
       return (
         <TabPanel id="ranking" className={PANEL_CLASS}>
           <RankingPanel horizonSec={horizonSec} catalogue={catalogue} bare />
+        </TabPanel>
+      )
+    case 'seeds':
+      return (
+        <TabPanel id="seeds" className={PANEL_CLASS}>
+          <SeedAdvicePanel advice={advice} />
         </TabPanel>
       )
     case 'animals':
@@ -155,12 +181,17 @@ export default function App() {
   )
   const livePools = inventory.pools.blocks.length
 
-  const tabs = buildTabs(hungry, livePools)
+  const advice = useMemo(
+    () => buildSeedAdvice(deferredInventory, catalogue, plan),
+    [deferredInventory, catalogue, plan],
+  )
+
+  const tabs = buildTabs(hungry, livePools, advice)
 
   const toolbar = <Tabs items={tabs} active={tab} onChange={setTab} label="Workspace" />
 
   // Everything but the farm itself renders the same way, with or without a farm loaded.
-  const panel = renderPanel(tab, plan, horizonSec, effective.seeds)
+  const panel = renderPanel(tab, plan, horizonSec, effective.seeds, advice)
 
   const sidebar = (
     <>

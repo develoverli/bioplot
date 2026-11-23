@@ -351,3 +351,59 @@ describe('rarity from a name', () => {
     expect(bedTypes('uncommon_cattle', 'tier-2').rarity).toBe('uncommon')
   })
 })
+
+describe('the recipe book', () => {
+  const offer = (code, extra = {}) => ({
+    code,
+    groupCode: 'farmSeeds',
+    craftingTimeSeconds: 0,
+    recipes: [
+      {
+        code,
+        isDefault: true,
+        requiredItems: [{ itemType: 'farmSeed', itemCode: `common_${code}`, count: 2 }],
+        resultGroups: [{ code: `${code}_ok`, items: [{ itemType: 'farmSeed', itemCode: `uncommon_${code}`, count: 1 }] }],
+      },
+    ],
+    ...extra,
+  })
+
+  it('keeps a merge price and an end date, and drops a price of zero', () => {
+    const [priced, free] = globalThis.BioplotParse.readCrafting({
+      data: {
+        items: [
+          offer('peas_seeds', { price: { currency: 'CFB', amount: 5000 }, dateTo: '2038-01-11T22:00:00.000Z' }),
+          offer('corn_seeds', { price: { currency: 'CFB', amount: 0 } }),
+        ],
+      },
+    })
+    expect(priced.price).toEqual({ currency: 'CFB', amount: 5000 })
+    expect(priced.dateTo).toBe('2038-01-11T22:00:00.000Z')
+    expect(free.price).toBeNull()
+    expect(free.dateTo).toBeNull()
+  })
+
+  it('plans from the whole book instead of the last page captured', () => {
+    const page = {
+      url: 'https://chainers.io/api/main/crafting/offers',
+      at: 1,
+      body: JSON.stringify({ data: { items: [offer('peas_seeds')], total: 3 } }),
+    }
+    const book = { offers: [offer('peas_seeds'), offer('corn_seeds'), offer('beet_seeds')], total: 3 }
+
+    const payload = toPayload([page], book)
+    expect(payload.crafting.map((entry) => entry.code)).toEqual(['peas_seeds', 'corn_seeds', 'beet_seeds'])
+    expect(payload.craftingTotal).toBe(3)
+  })
+
+  it('falls back to the captured page when there is no book', () => {
+    const page = {
+      url: 'https://chainers.io/api/main/crafting/offers',
+      at: 1,
+      body: JSON.stringify({ data: { items: [offer('peas_seeds')], total: 378 } }),
+    }
+    const payload = toPayload([page])
+    expect(payload.crafting).toHaveLength(1)
+    expect(payload.craftingTotal).toBeNull()
+  })
+})

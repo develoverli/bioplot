@@ -197,6 +197,13 @@ export interface CraftOffer {
   groupCode: string
   craftingTimeSeconds: number
   recipes: CraftRecipe[]
+  /**
+   * Currency charged on top of the items, when the game asks for any. The amount is raw: its
+   * decimals are not in the capture, so only the currency is shown to the player.
+   */
+  price?: { currency: string; amount: number } | null
+  /** When an event recipe stops being craftable. Null for the permanent ones. */
+  dateTo?: string | null
 }
 
 /** A live reward-pool block: what it pays and how much of it is yours. */
@@ -275,6 +282,11 @@ export interface Inventory {
   items: InventoryItem[]
   /** Crafting recipes as the game reports them. */
   crafting: CraftOffer[]
+  /**
+   * How many recipes the game says exist. Compared with `crafting.length` it tells whether
+   * the Workshop was scrolled to the end. Null or absent when an older extension sent the farm.
+   */
+  craftingTotal?: number | null
   /** Live reward-pool blocks, the pool groups and your tier. */
   pools: Pools
 }

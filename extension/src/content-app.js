@@ -56,7 +56,7 @@
         return
       }
 
-      const payload = globalThis.BioplotParse.toPayload(captures)
+      const payload = globalThis.BioplotParse.toPayload(captures, response?.recipes ?? null)
       if (payload.seeds.length === 0 && payload.plots.length === 0) {
         // Naming what IS stored turns a dead end into something the player can act on:
         // usually the farm endpoints are simply absent because the farm was never opened.

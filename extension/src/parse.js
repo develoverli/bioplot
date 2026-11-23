@@ -270,12 +270,23 @@
           count: readCount(item?.count) ?? 1,
         }))
 
+    // A merge can cost currency on top of its items. The amount is kept as the game sends it:
+    // its decimals are not in this payload, so the app names the currency and leaves the
+    // number to the game rather than printing a figure that could be off by 10^9.
+    const readPrice = (price) => {
+      const amount = Number(price?.amount)
+      if (typeof price?.currency !== 'string' || !Number.isFinite(amount) || amount <= 0) return null
+      return { currency: price.currency, amount }
+    }
+
     return rows
       .filter((offer) => typeof offer?.code === 'string')
       .map((offer) => ({
         code: offer.code,
         groupCode: String(offer?.groupCode ?? ''),
         craftingTimeSeconds: readCount(offer?.craftingTimeSeconds) ?? 0,
+        price: readPrice(offer?.price),
+        dateTo: typeof offer?.dateTo === 'string' ? offer.dateTo : null,
         recipes: (offer?.recipes ?? []).map((recipe) => ({
           code: String(recipe?.code ?? ''),
           isDefault: Boolean(recipe?.isDefault),
@@ -651,7 +662,13 @@
   }
 
   /** Merges the rows found across every capture into one payload for the web app. */
-  function toPayload(captures) {
+  /**
+   * @param captures Stored responses, one per endpoint.
+   * @param recipes  The recipe book the service worker accumulates across pages, when present:
+   *   `{ offers, total }`. The game pages recipes 20 at a time, so a single capture never holds
+   *   them all; the book does, and it wins over whatever single page was captured.
+   */
+  function toPayload(captures, recipes = null) {
     const seeds = new Map()
     let plots = []
     let gardens = []
@@ -738,6 +755,11 @@
     // unavailable; otherwise they would double-count the ones already placed.
     if (!sawGardens && plots.length === 0) plots = spareBeds
 
+    const bookOffers = Array.isArray(recipes?.offers) ? recipes.offers : []
+    if (bookOffers.length > 0) crafting = readCrafting({ data: { items: bookOffers } })
+    const craftingTotal =
+      Number.isFinite(recipes?.total) && recipes.total > 0 ? Math.floor(recipes.total) : null
+
     return {
       version: 1,
       source: 'bioplot-extension',
@@ -748,6 +770,7 @@
       catalogue,
       items,
       crafting,
+      craftingTotal,
       pools,
     }
   }

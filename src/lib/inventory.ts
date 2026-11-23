@@ -183,6 +183,9 @@ const craftOfferSchema = z.object({
   code: z.string(),
   groupCode: z.string(),
   craftingTimeSeconds: z.number().min(0),
+  // Optional: an extension older than the recipe book does not send them.
+  price: z.object({ currency: z.string(), amount: z.number() }).nullable().optional(),
+  dateTo: z.string().nullable().optional(),
   recipes: z.array(
     z.object({
       code: z.string(),
@@ -263,6 +266,7 @@ export const inventorySchema = z.object({
   gardens: z.array(gardenSchema).default([]),
   items: z.array(inventoryItemSchema).default([]),
   crafting: z.array(craftOfferSchema).default([]),
+  craftingTotal: z.number().nullish(),
   pools: poolsSchema.default(emptyPools),
 })
 
@@ -300,6 +304,7 @@ export const importPayloadSchema = z.object({
   catalogue: catalogueSchema.default(emptyCatalogue),
   items: z.array(inventoryItemSchema).default([]),
   crafting: z.array(craftOfferSchema).default([]),
+  craftingTotal: z.number().nullable().default(null),
   pools: poolsSchema.default(emptyPools),
   raw: z.unknown().optional(),
 })
@@ -398,6 +403,7 @@ export function fromImportPayload(payload: ImportPayload): ImportResult {
       gardens,
       items: payload.items ?? [],
       crafting: payload.crafting ?? [],
+      craftingTotal: payload.craftingTotal ?? null,
       pools: payload.pools ?? emptyPools,
       seeds: [...stacks].map(([key, count]) => {
         const [seedId, rarity] = key.split('|') as [string, Rarity]
