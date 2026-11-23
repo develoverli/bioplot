@@ -141,6 +141,27 @@ Every response uses the standard envelope; the useful part is always `data`.
 A recipe with more than one `resultGroups` entry is a roll, not a guarantee. `src/lib/feed.ts`
 reports the worst and best group rather than averaging them, because the odds are not published.
 
+### Recipes come 20 at a time (seen 2026-11-23)
+
+`/api/main/crafting/offers` is paginated: `data.limit: 20`, `data.total: 378`. A single
+capture therefore holds one page, and the capture store (one slot per URL, 60 slots) either let
+pages overwrite each other or would have pushed the farm itself out. So the service worker keeps
+a separate **recipe book** (`chrome.storage.local` key `recipes`): offer code → trimmed offer
+(no titles or art), plus the largest `data.total` seen, since a single-group view reports a
+smaller total than "all". Offers past their `dateTo` are dropped; the popup's reset clears it.
+The player fills it by scrolling the Workshop to the end once; the popup shows `Recipes X / Y`.
+
+The docs do not help here: the Workshop page says recipes are "learned directly from the game",
+and feed recipes are published only as images, some already out of date (event piggy food is
+`1 + 1` in the docs, while live `common_deer_food` is `5 legendary strawberry + 5 legendary
+peas -> 3`). The game is the only source.
+
+Offers also carry `price {currency, amount}` and `dateTo`. The amount's decimals are not in the
+payload (CFB balances read like `221578417313`), so the app names the currency and never prints
+the figure. Every seed merge seen is `2x rarity N -> 1x N+1` with a single result group, but
+`src/lib/seedAdvice.ts` uses each recipe's real counts and refuses rolls and missing recipes
+rather than assuming that shape.
+
 Animal feeding rates are **not** reported anywhere seen so far, so the feed panel stops at
 "how much feed you can craft" instead of guessing how long it lasts.
 
